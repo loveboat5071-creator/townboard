@@ -290,7 +290,9 @@ export async function POST(req: NextRequest) {
 
       for (const [field, colStr] of Object.entries(colMap)) {
         const col = parseInt(colStr);
-        const cellValue = row.getCell(col).value;
+        if (isNaN(col)) continue;
+        const cell = row.getCell(col);
+        const cellValue = cell ? cell.value : null;
         if (cellValue != null && cellValue !== '') hasData = true;
 
         const numFields = [
@@ -319,34 +321,59 @@ export async function POST(req: NextRequest) {
     });
 
     if (action === 'save') {
-      const { enriched, stats } = enrichWithBundledFields(records);
+      if (records.length === 0) {
+        return NextResponse.json({ error: '파싱된 유효한 행이 없습니다. 엑셀 형식을 확인해주세요.' }, { status: 400 });
+      }
+
+      let enriched = records;
+      let stats = {
+        latLngFilled: 0,
+        restrictionsFilled: 0,
+        pricingFilled: 0,
+        evFilled: 0,
+        matchedRows: 0,
+      };
+
+      try {
+        const enrichedResult = enrichWithBundledFields(records);
+        enriched = enrichedResult.enriched;
+        stats = enrichedResult.stats;
+      } catch (enrichError) {
+        console.error('Enrichment failed:', enrichError);
+        // 복원 실패해도 원본이라도 저장하도록 진행 (단, 로그에는 남김)
+      }
 
       // Vercel Blob에 저장 시도
-      const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
+      const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+      const hasBlob = !!blobToken;
 
-      if (hasBlob) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await saveToBlob(enriched as any[], {
-          displayName: file.name,
-          uploadedAt: new Date().toISOString(),
-          rowCount: enriched.length,
-        });
-        if (result.success) {
+      if (hasBlob && blobToken.startsWith('vercel_blob_rw_')) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const result = await saveToBlob(enriched as any[], {
+            displayName: file.name,
+            uploadedAt: new Date().toISOString(),
+            rowCount: enriched.length,
+          });
+          if (result.success) {
+            return NextResponse.json({
+              success: true,
+              message: `✅ ${enriched.length}건 Blob 저장 완료`,
+              count: enriched.length,
+              storage: 'vercel-blob',
+              url: result.url,
+              enrichment: stats,
+            });
+          }
           return NextResponse.json({
-            success: true,
-            message: `✅ ${enriched.length}건 Blob 저장 완료`,
+            success: false,
+            message: `Blob 저장 실패: ${result.error}`,
             count: enriched.length,
-            storage: 'vercel-blob',
-            url: result.url,
             enrichment: stats,
           });
+        } catch (saveError) {
+          return NextResponse.json({ error: `Blob 전송 오류: ${saveError}` }, { status: 500 });
         }
-        return NextResponse.json({
-          success: false,
-          message: `Blob 저장 실패: ${result.error}`,
-          count: enriched.length,
-          enrichment: stats,
-        });
       }
 
       // 로컬 파일 시스템 저장 시도 (개발 환경)
@@ -354,6 +381,14 @@ export async function POST(req: NextRequest) {
         const fs = await import('fs');
         const path = await import('path');
         const targetPath = path.join(process.cwd(), 'public', 'data', 'master.json');
+        
+        // Vercel 환경인지 체크 (파일 시스템 쓰기 가능 여부)
+        if (process.env.VERCEL === '1') {
+          return NextResponse.json({ 
+            error: 'Vercel 환경에서는 Blob Storage 설정이 필요합니다. [Vercel Dashboard > Storage] 설정을 확인해주세요.' 
+          }, { status: 500 });
+        }
+
         const metaPath = path.join(process.cwd(), 'public', 'data', 'master.meta.json');
         fs.writeFileSync(targetPath, JSON.stringify(enriched, null, 2), 'utf-8');
         fs.writeFileSync(metaPath, JSON.stringify({
@@ -369,10 +404,10 @@ export async function POST(req: NextRequest) {
           storage: 'local',
           enrichment: stats,
         });
-      } catch {
+      } catch (fsError) {
         return NextResponse.json({
           success: false,
-          message: 'Blob Store를 연결하거나 로컬 환경에서 실행해주세요.',
+          error: `파일 저장 실패 (Vercel Blob 연결 필요): ${fsError}`,
           count: enriched.length,
           enrichment: stats,
         });
@@ -389,6 +424,8 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error) {
-    return NextResponse.json({ error: `업로드 실패: ${error}` }, { status: 500 });
+    console.error('Upload handler error:', error);
+    const msg = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: `업로드 서버 오류: ${msg}` }, { status: 500 });
   }
 }
