@@ -340,7 +340,6 @@ export async function POST(req: NextRequest) {
         stats = enrichedResult.stats;
       } catch (enrichError) {
         console.error('Enrichment failed:', enrichError);
-        // 복원 실패해도 원본이라도 저장하도록 진행 (단, 로그에는 남김)
       }
 
       // Vercel Blob에 저장 시도
@@ -349,17 +348,38 @@ export async function POST(req: NextRequest) {
 
       if (hasBlob && blobToken.startsWith('vercel_blob_rw_')) {
         try {
+          // [추가] 기존 데이터와 병합 로직
+          let finalData = enriched;
+          try {
+            const existingData = await loadMasterDataAsync();
+            if (existingData && existingData.length > 0) {
+              const dataMap = new Map();
+              // 기존 데이터 먼저 담기
+              for (const item of existingData) {
+                if (item.id) dataMap.set(item.id, item);
+              }
+              // 새 데이터로 덮어쓰거나 추가
+              for (const item of enriched) {
+                if (item.id) dataMap.set(item.id, item);
+              }
+              finalData = Array.from(dataMap.values());
+              console.log(`Merged data: existing ${existingData.length} + new ${enriched.length} -> total ${finalData.length}`);
+            }
+          } catch (loadError) {
+            console.warn('Failed to load existing data for merge, proceeding with new data only:', loadError);
+          }
+
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const result = await saveToBlob(enriched as any[], {
+          const result = await saveToBlob(finalData as any[], {
             displayName: file.name,
             uploadedAt: new Date().toISOString(),
-            rowCount: enriched.length,
+            rowCount: finalData.length,
           });
           if (result.success) {
             return NextResponse.json({
               success: true,
-              message: `✅ ${enriched.length}건 Blob 저장 완료`,
-              count: enriched.length,
+              message: `✅ 총 ${finalData.length}건 데이터 반영 완료 (신규 ${enriched.length}건 병합됨)`,
+              count: finalData.length,
               storage: 'vercel-blob',
               url: result.url,
               enrichment: stats,
