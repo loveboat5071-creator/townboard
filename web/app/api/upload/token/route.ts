@@ -1,4 +1,4 @@
-import { generateClientTokenFromReadWriteToken } from '@vercel/blob/client';
+import { generateClientTokenFromReadWriteToken } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
