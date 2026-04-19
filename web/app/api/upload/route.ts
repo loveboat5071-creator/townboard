@@ -5,8 +5,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { saveToBlob, invalidateCache } from '@/lib/masterData';
+import { saveToBlob, invalidateCache, loadMasterDataAsync } from '@/lib/masterData';
 import { makeComplexId } from '@/lib/types';
+
+export const maxDuration = 60; // 실행 시간을 60초로 연장
+export const dynamic = 'force-dynamic';
 
 type ParsedRecord = Record<string, unknown>;
 
@@ -353,14 +356,15 @@ export async function POST(req: NextRequest) {
           try {
             const existingData = await loadMasterDataAsync();
             if (existingData && existingData.length > 0) {
-              const dataMap = new Map();
+              const dataMap = new Map<string, any>();
               // 기존 데이터 먼저 담기
               for (const item of existingData) {
-                if (item.id) dataMap.set(item.id, item);
+                if (item && item.id) dataMap.set(item.id, item);
               }
               // 새 데이터로 덮어쓰거나 추가
-              for (const item of enriched) {
-                if (item.id) dataMap.set(item.id, item);
+              for (const newItem of enriched) {
+                const item = newItem as any;
+                if (item && item.id) dataMap.set(item.id, item);
               }
               finalData = Array.from(dataMap.values());
               console.log(`Merged data: existing ${existingData.length} + new ${enriched.length} -> total ${finalData.length}`);
