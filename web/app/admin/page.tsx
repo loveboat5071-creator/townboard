@@ -214,8 +214,9 @@ export default function AdminPage() {
   // ── 관리자 ──────────────────────────
   return (
     <div className="app-container" style={{ maxWidth: 1080 }}>
-      <header className="header">
+      <header className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 onClick={() => { window.location.href = '/'; }} style={{ cursor: 'pointer' }}>⚙️ 관리자 페이지</h1>
+        <span style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.7 }}>v1.5 - Direct Upload</span>
       </header>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
