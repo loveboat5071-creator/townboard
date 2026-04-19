@@ -1,30 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { saveToBlob, loadMasterDataAsync } from '@/lib/masterData';
+import ExcelJS from 'exceljs';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
-    const { url, fileName } = await req.json();
+    const body = await req.json();
+    const { url, fileName } = body;
+    
     if (!url) {
       return NextResponse.json({ error: '파일 URL이 없습니다' }, { status: 400 });
     }
 
-    // 업로드된 엑셀 파일을 URL로부터 가져오기
     const resp = await fetch(url);
     if (!resp.ok) throw new Error('업로드된 파일을 읽을 수 없습니다.');
     const arrBuf = await resp.arrayBuffer();
 
-    const ExcelJS = (await import('exceljs')).default;
     const wb = new ExcelJS.Workbook();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await wb.xlsx.load(arrBuf as any);
     
     const ws = wb.worksheets[0];
     if (!ws) throw new Error('시트를 찾을 수 없습니다.');
 
-    // ── 데이터 파싱 ────────────────
     const headers: string[] = [];
     ws.getRow(1).eachCell((cell, colNumber) => {
       headers[colNumber] = String(cell.value || '').trim();
@@ -74,21 +73,20 @@ export async function POST(req: NextRequest) {
         }
       }
       if (hasData && record.name) {
-        // ID 생성
         record.id = [record.name, record.addr_road || record.addr_parcel || ''].map(v => String(v).replace(/\s/g, '')).join('__');
         records.push(record);
       }
     });
 
-    // 기존 데이터와 병합
     const existingData = await loadMasterDataAsync();
     const dataMap = new Map<string, any>();
-    for (const item of existingData) { if (item && item.id) dataMap.set(item.id, item); }
+    if (existingData) {
+      for (const item of existingData) { if (item && item.id) dataMap.set(item.id, item); }
+    }
     for (const item of records) { if (item && item.id) dataMap.set(item.id, item); }
     
     const finalData = Array.from(dataMap.values());
 
-    // 최종 Blob 저장
     const saveResult = await saveToBlob(finalData as any[], {
       displayName: fileName || 'direct_upload.xlsx',
       uploadedAt: new Date().toISOString(),
