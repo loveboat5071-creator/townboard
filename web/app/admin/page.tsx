@@ -95,112 +95,38 @@ export default function AdminPage() {
 
   const [uploadProgress, setUploadProgress] = useState('');
 
-  const handleUploadChunked = useCallback(async () => {
+  const handleUploadDirect = useCallback(async () => {
     if (!file) { setError('파일을 선택해주세요.'); return; }
     setIsSaving(true);
     setError('');
     setResult(null);
-    setUploadProgress('엑셀 데이터 분석 중...');
+    setUploadProgress('클라우드 저장소에 전송 중...');
 
     try {
-      const ExcelJS = (await import('exceljs')).default;
-      const wb = new ExcelJS.Workbook();
-      const arrBuf = await file.arrayBuffer();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await wb.xlsx.load(arrBuf as any);
+      const { upload } = await import('@vercel/blob/client');
       
-      const ws = wb.worksheets[0];
-      if (!ws) throw new Error('시트를 찾을 수 없습니다.');
-
-      // ── 데이터 파싱 (서버와 동일한 로직) ────────────────
-      const headers: string[] = [];
-      const row1 = ws.getRow(1);
-      row1.eachCell((cell, colNumber) => { headers[colNumber] = String(cell.value || '').trim(); });
-
-      const colMap: Record<string, number> = {};
-      const mapping: Record<string, string[]> = {
-        name: ['단지명', '아파트명', 'name', '명칭'],
-        city: ['도시', '시도', '시', 'city'],
-        district: ['시군구', '구군', '구', 'district'],
-        dong: ['동', '법정동', 'dong'],
-        addr_parcel: ['지번주소', '주소(지번)', '주소_지번', 'addr_parcel'],
-        addr_road: ['도로명주소', '주소(도로명)', '주소_도로명', 'addr_road', '도로명'],
-        households: ['총세대수', '세대수', 'households', '총 세대수'],
-        units: ['판매수량', '판매', 'units'],
-        unit_price: ['대당단가', '단가', 'unit_price'],
-        price_4w: ['4주금액', '4주 금액', 'price_4w'],
-        r1_industry: ['구좌1업종', 'r1_industry'],
-        r2_industry: ['구좌2업종', 'r2_industry'],
-        lat: ['위도', 'lat', 'latitude'],
-        lng: ['경도', 'lng', 'longitude'],
-      };
-
-      for (const [field, aliases] of Object.entries(mapping)) {
-        for (let i = 1; i < headers.length; i++) {
-          const h = (headers[i] || '').replace(/\s+/g, '').toLowerCase();
-          if (aliases.some(a => a.replace(/\s+/g, '').toLowerCase() === h)) {
-            colMap[field] = i;
-            break;
-          }
-        }
-      }
-
-      const allRecords: any[] = [];
-      ws.eachRow((row, rowNumber) => {
-        if (rowNumber === 1) return;
-        const record: any = {};
-        let hasData = false;
-        for (const [field, col] of Object.entries(colMap)) {
-          const cellValue = row.getCell(col).value;
-          if (cellValue != null && cellValue !== '') hasData = true;
-          
-          if (['households', 'units', 'unit_price', 'price_4w', 'lat', 'lng'].includes(field)) {
-            const n = Number(cellValue);
-            record[field] = isNaN(n) ? null : n;
-          } else {
-            record[field] = cellValue != null ? String(cellValue).trim() : null;
-          }
-        }
-        if (hasData && record.name) {
-          if (!record.id) {
-            // ID 생성 로직 (lib과 동일하게 흉내)
-            record.id = [record.name, record.addr_road || record.addr_parcel || ''].map(v => String(v).replace(/\s/g, '')).join('__');
-          }
-          allRecords.push(record);
-        }
+      // 1. 클라우드에 직접 업로드
+      const blob = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: '/api/upload/token',
       });
 
-      if (allRecords.length === 0) throw new Error('유효한 데이터가 없습니다.');
+      setUploadProgress('데이터베이스 분석 및 반영 중...');
 
-      // ── 분할 전송 (Chunking) ────────────────
-      const uploadId = `up_${Date.now()}`;
-      const chunkSize = 500;
-      const totalSteps = Math.ceil(allRecords.length / chunkSize);
+      // 2. 서버에 처리 요청
+      const resp = await fetch('/api/upload/process-blob', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: blob.url,
+          fileName: file.name
+        })
+      });
 
-      for (let i = 0; i < totalSteps; i++) {
-        const start = i * chunkSize;
-        const end = Math.min(start + chunkSize, allRecords.length);
-        const chunk = allRecords.slice(start, end);
-        const isFinal = i === totalSteps - 1;
-
-        setUploadProgress(`전송 중... (${i + 1}/${totalSteps})`);
-
-        const resp = await fetch('/api/upload/chunk', {
-          method: 'POST',
-          body: JSON.stringify({
-            uploadId,
-            chunk,
-            isFinal,
-            totalRows: allRecords.length,
-            fileName: file.name
-          })
-        });
-
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.error || '분할 전송 실패');
-        if (isFinal) setResult(data);
-      }
-
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || '최종 반영 실패');
+      
+      setResult(data);
       setUploadProgress('');
       void loadStatus();
 
@@ -398,7 +324,7 @@ export default function AdminPage() {
             <button className="btn btn-primary" onClick={() => handlePreview()} disabled={!file || isUploading} style={{ flex: 1 }}>
               {isUploading ? '파싱 중...' : '🔍 미리보기'}
             </button>
-            <button className="btn btn-success" onClick={() => handleUploadChunked()} disabled={!file || isSaving} style={{ flex: 1 }}>
+            <button className="btn btn-success" onClick={() => handleUploadDirect()} disabled={!file || isSaving} style={{ flex: 1 }}>
               {isSaving ? '저장 중...' : '💾 DB 갱신'}
             </button>
           </div>
