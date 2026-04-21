@@ -14,7 +14,8 @@ export async function GET() {
 
   try {
     // 다시 @vercel/blob/client에서 시도 (최신 가이드 기준)
-    const clientToken = await generateClientTokenFromReadWriteToken({
+    // 타입 정의 충돌 방지를 위해 any 사용
+    const clientToken = await (generateClientTokenFromReadWriteToken as any)({
       payload: JSON.stringify({}),
       token,
     });
