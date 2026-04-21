@@ -13,9 +13,8 @@ export async function POST() {
   }
 
   try {
-    // 타입 정의 충돌 방지를 위해 any 사용
+    // 옵션을 최소화하여 토큰 생성 시도
     const clientToken = await (generateClientTokenFromReadWriteToken as any)({
-      payload: JSON.stringify({}),
       token,
     });
 
