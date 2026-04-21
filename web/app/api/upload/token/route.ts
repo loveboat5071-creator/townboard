@@ -13,9 +13,10 @@ export async function POST() {
   }
 
   try {
-    // 옵션을 최소화하여 토큰 생성 시도
+    // 유효 기간을 24시간으로 대폭 늘려봅니다.
     const clientToken = await (generateClientTokenFromReadWriteToken as any)({
       token,
+      expiresIn: 86400,
     });
 
     return NextResponse.json({ clientToken });
