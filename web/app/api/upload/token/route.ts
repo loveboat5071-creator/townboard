@@ -23,8 +23,9 @@ export async function GET() {
     return NextResponse.json({ clientToken });
   } catch (error) {
     console.error('Token generation error:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ 
-      error: '클라이언트 접속 권한 생성 실패. 서버 로그를 확인해주세요.' 
+      error: `클라이언트 토큰 생성 실패: ${errorMessage}` 
     }, { status: 500 });
   }
 }
