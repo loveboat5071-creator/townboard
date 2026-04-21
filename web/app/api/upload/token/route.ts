@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function POST() {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   
   if (!token) {
@@ -13,7 +13,6 @@ export async function GET() {
   }
 
   try {
-    // 다시 @vercel/blob/client에서 시도 (최신 가이드 기준)
     // 타입 정의 충돌 방지를 위해 any 사용
     const clientToken = await (generateClientTokenFromReadWriteToken as any)({
       payload: JSON.stringify({}),
@@ -28,4 +27,8 @@ export async function GET() {
       error: `클라이언트 토큰 생성 실패: ${errorMessage}` 
     }, { status: 500 });
   }
+}
+// 혹은 GET도 일단 열어둡니다 (디버깅용)
+export async function GET() {
+  return POST();
 }
