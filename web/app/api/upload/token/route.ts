@@ -1,34 +1,46 @@
-import { generateClientTokenFromReadWriteToken } from '@vercel/blob/client';
+import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { NextResponse } from 'next/server';
 
-export const dynamic = 'force-dynamic';
-
-export async function POST() {
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
-  
-  if (!token) {
-    return NextResponse.json({ 
-      error: '서버 설정 오류: BLOB_READ_WRITE_TOKEN이 없습니다. Vercel Storage 설정을 확인해주세요.' 
-    }, { status: 500 });
-  }
+export async function POST(request: Request): Promise<NextResponse> {
+  const body = (await request.json()) as HandleUploadBody;
 
   try {
-    // 유효 기간을 24시간으로 대폭 늘려봅니다.
-    const clientToken = await (generateClientTokenFromReadWriteToken as any)({
-      token,
-      expiresIn: 86400,
+    const jsonResponse = await handleUpload({
+      body,
+      request,
+      onBeforeGenerateToken: async (
+        pathname,
+        /* partOfNextjsAPIExample */
+      ) => {
+        // 실제 운영 환경에서는 여기서 세션 체크 등을 수행할 수 있습니다.
+        return {
+          allowedContentTypes: [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+            'application/json',
+            'text/csv'
+          ],
+          tokenPayload: JSON.stringify({
+            // 필요 시 추가 정보를 전달할 수 있습니다.
+          }),
+        };
+      },
+      onUploadCompleted: async ({ blob, tokenPayload }) => {
+        // 업로드 완료 시 수행할 로직 (필요 시)
+        console.log('blob upload completed', blob, tokenPayload);
+      },
     });
 
-    return NextResponse.json({ clientToken });
+    return NextResponse.json(jsonResponse);
   } catch (error) {
-    console.error('Token generation error:', error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ 
-      error: `클라이언트 토큰 생성 실패: ${errorMessage}` 
-    }, { status: 500 });
+    return NextResponse.json(
+      { error: (error as Error).message },
+      { status: 400 }, // 서버 에러 시 400으로 응답하여 SDK가 다시 시도하도록 함
+    );
   }
 }
-// 혹은 GET도 일단 열어둡니다 (디버깅용)
+
+// GET 요청은 무시하거나 에러 처리
 export async function GET() {
-  return POST();
+  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
 }
