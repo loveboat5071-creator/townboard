@@ -1,8 +1,15 @@
-import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
+import { handleUpload, type HandleUploadBody } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request): Promise<NextResponse> {
   console.log('--- Upload Handshake Started ---');
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+
+  if (!token) {
+    console.error('Error: BLOB_READ_WRITE_TOKEN is missing!');
+    return NextResponse.json({ error: '서버 설정 오류: 토큰이 없습니다.' }, { status: 500 });
+  }
+
   try {
     const body = (await request.json()) as HandleUploadBody;
     console.log('Request body:', JSON.stringify(body));
@@ -10,6 +17,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const jsonResponse = await handleUpload({
       body,
       request,
+      token, // 토큰을 명시적으로 전달
       onBeforeGenerateToken: async (pathname) => {
         console.log('Generating token for:', pathname);
         return {
