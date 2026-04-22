@@ -103,57 +103,45 @@ export default function AdminPage() {
     setUploadProgress('클라우드 저장소에 전송 중...');
 
     try {
-      console.log('--- Direct Upload Started ---');
+      console.log('--- Server Streaming Upload Started ---');
       console.log('Selected file:', file.name, 'Size:', file.size, 'bytes');
 
-      const { upload } = await import('@vercel/blob/client');
-      console.log('Vercel Blob SDK loaded successfully');
-      
-      // 1. 클레이드에 직접 업로드 (직행 방식)
-      console.log('Fetching client token for direct upload...');
-      const tokenResp = await fetch('/api/upload/token', { method: 'POST' });
-      const { clientToken, error: tokenError } = await tokenResp.json();
-      
-      if (!tokenResp.ok || !clientToken) {
-        throw new Error(tokenError || '업로드 권한(Token)을 받지 못했습니다.');
-      }
-      console.log('Client token received successfully');
+      setUploadProgress('서버로 데이터 스트리밍 중...');
 
-      const safeFileName = `upload_${Date.now()}.xlsx`;
-      console.log('Starting direct upload with explicit token...');
-      const blob = await upload(safeFileName, file, {
-        access: 'public',
-        token: clientToken, // 핸드쉐이크 대신 토큰 직접 사용
-      });
+      // 1. 서버 스트리밍 엔드포인트로 파일 전송 (4.5MB 제한 우회)
+      const streamResp = await fetch(`/api/upload/stream?filename=${encodeURIComponent(file.name)}`, {
+        method: 'POST',
+        body: file, // 파일을 바디로 직접 전달 (Streaming 시작)
+        duplex: 'half' // 최신 브라우저 통신 옵션
+      } as any);
 
-      console.log('Direct upload finished. Blob URL:', blob.url);
+      const streamData = await streamResp.json();
+      if (!streamResp.ok) throw new Error(streamData.error || '파일 스트리밍 전송 실패');
+      
+      console.log('Stream upload finished. Blob URL:', streamData.url);
       setUploadProgress('데이터베이스 분석 및 반영 중...');
 
-      // 2. 서버에 처리 요청
-      console.log('Requesting server to process the uploaded blob...');
-      const resp = await fetch('/api/upload/process-blob', {
+      // 2. 서버에 처리 요청 (동일하게 진행)
+      const processResp = await fetch('/api/upload/process-blob', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          url: blob.url,
+          url: streamData.url,
           fileName: file.name
         })
       });
 
-      const data = await resp.json();
-      console.log('Server process response:', data);
-
-      if (!resp.ok) throw new Error(data.error || `최종 반영 실패 (상태 코드: ${resp.status})`);
+      const data = await processResp.json();
+      if (!processResp.ok) throw new Error(data.error || 'DB 반영 단계 실패');
       
-      console.log('All steps completed successfully!');
+      console.log('Streaming workflow completed successfully!');
       setResult(data);
       setUploadProgress('');
       void loadStatus();
 
     } catch (e: any) {
-      console.error('Final upload catch block:', e);
-      const errorMessage = e instanceof Error ? e.message : String(e);
-      setError(`업로드 실패: ${errorMessage}`);
+      console.error('Streaming workflow catch block:', e);
+      setError(`전송 에러: ${e.message || String(e)}`);
       setUploadProgress('');
     } finally {
       setIsSaving(false);
