@@ -109,15 +109,21 @@ export default function AdminPage() {
       const { upload } = await import('@vercel/blob/client');
       console.log('Vercel Blob SDK loaded successfully');
       
-      // 1. 클라우드에 직접 업로드
-      // [수정] 한글/특수문자 에러 방지를 위해 안전한 이름으로 변환하여 전송
-      const safeFileName = `upload_${Date.now()}.xlsx`;
-      console.log('Renaming file for safety:', file.name, '->', safeFileName);
+      // 1. 클레이드에 직접 업로드 (직행 방식)
+      console.log('Fetching client token for direct upload...');
+      const tokenResp = await fetch('/api/upload/token', { method: 'POST' });
+      const { clientToken, error: tokenError } = await tokenResp.json();
+      
+      if (!tokenResp.ok || !clientToken) {
+        throw new Error(tokenError || '업로드 권한(Token)을 받지 못했습니다.');
+      }
+      console.log('Client token received successfully');
 
-      console.log('Starting direct upload to Vercel Blob via handshake...');
+      const safeFileName = `upload_${Date.now()}.xlsx`;
+      console.log('Starting direct upload with explicit token...');
       const blob = await upload(safeFileName, file, {
         access: 'public',
-        handleUploadUrl: '/api/upload/token',
+        token: clientToken, // 핸드쉐이크 대신 토큰 직접 사용
       });
 
       console.log('Direct upload finished. Blob URL:', blob.url);
