@@ -110,8 +110,12 @@ export default function AdminPage() {
       console.log('Vercel Blob SDK loaded successfully');
       
       // 1. 클라우드에 직접 업로드
+      // [수정] 한글/특수문자 에러 방지를 위해 안전한 이름으로 변환하여 전송
+      const safeFileName = `upload_${Date.now()}.xlsx`;
+      console.log('Renaming file for safety:', file.name, '->', safeFileName);
+
       console.log('Starting direct upload to Vercel Blob via handshake...');
-      const blob = await upload(file.name, file, {
+      const blob = await upload(safeFileName, file, {
         access: 'public',
         handleUploadUrl: '/api/upload/token',
       });
