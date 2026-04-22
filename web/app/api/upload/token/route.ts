@@ -2,17 +2,16 @@ import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const body = (await request.json()) as HandleUploadBody;
-
+  console.log('--- Upload Handshake Started ---');
   try {
+    const body = (await request.json()) as HandleUploadBody;
+    console.log('Request body:', JSON.stringify(body));
+
     const jsonResponse = await handleUpload({
       body,
       request,
-      onBeforeGenerateToken: async (
-        pathname,
-        /* partOfNextjsAPIExample */
-      ) => {
-        // 실제 운영 환경에서는 여기서 세션 체크 등을 수행할 수 있습니다.
+      onBeforeGenerateToken: async (pathname) => {
+        console.log('Generating token for:', pathname);
         return {
           allowedContentTypes: [
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -21,21 +20,22 @@ export async function POST(request: Request): Promise<NextResponse> {
             'text/csv'
           ],
           tokenPayload: JSON.stringify({
-            // 필요 시 추가 정보를 전달할 수 있습니다.
+            timestamp: new Date().toISOString(),
           }),
         };
       },
       onUploadCompleted: async ({ blob, tokenPayload }) => {
-        // 업로드 완료 시 수행할 로직 (필요 시)
-        console.log('blob upload completed', blob, tokenPayload);
+        console.log('Upload completed:', blob.url);
       },
     });
 
+    console.log('Handshake response generated successfully');
     return NextResponse.json(jsonResponse);
   } catch (error) {
+    console.error('Handshake error:', error);
     return NextResponse.json(
       { error: (error as Error).message },
-      { status: 400 }, // 서버 에러 시 400으로 응답하여 SDK가 다시 시도하도록 함
+      { status: 400 },
     );
   }
 }
