@@ -103,17 +103,24 @@ export default function AdminPage() {
     setUploadProgress('클라우드 저장소에 전송 중...');
 
     try {
+      console.log('--- Direct Upload Started ---');
+      console.log('Selected file:', file.name, 'Size:', file.size, 'bytes');
+
       const { upload } = await import('@vercel/blob/client');
+      console.log('Vercel Blob SDK loaded successfully');
       
       // 1. 클라우드에 직접 업로드
+      console.log('Starting direct upload to Vercel Blob via handshake...');
       const blob = await upload(file.name, file, {
         access: 'public',
         handleUploadUrl: '/api/upload/token',
       });
 
+      console.log('Direct upload finished. Blob URL:', blob.url);
       setUploadProgress('데이터베이스 분석 및 반영 중...');
 
       // 2. 서버에 처리 요청
+      console.log('Requesting server to process the uploaded blob...');
       const resp = await fetch('/api/upload/process-blob', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -124,14 +131,19 @@ export default function AdminPage() {
       });
 
       const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || '최종 반영 실패');
+      console.log('Server process response:', data);
+
+      if (!resp.ok) throw new Error(data.error || `최종 반영 실패 (상태 코드: ${resp.status})`);
       
+      console.log('All steps completed successfully!');
       setResult(data);
       setUploadProgress('');
       void loadStatus();
 
-    } catch (e) {
-      setError(`업로드 실패: ${e}`);
+    } catch (e: any) {
+      console.error('Final upload catch block:', e);
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      setError(`업로드 실패: ${errorMessage}`);
       setUploadProgress('');
     } finally {
       setIsSaving(false);
