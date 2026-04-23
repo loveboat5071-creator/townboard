@@ -259,7 +259,7 @@ export async function POST(req: NextRequest) {
       district: ['시군구', '구군', '구', 'district'],
       dong: ['동', '법정동', 'dong', '읍', '면'],
       addr_parcel: ['지번주소', '주소(지번)', '주소_지번', 'addr_parcel'],
-      addr_road: ['도로명주소', '주소(도로명)', '주소_도로명', 'addr_road', '도로명', '주소'],
+      addr_road: ['도로명주소', '주소(도로명)', '주소_도로명', 'addr_road', '도로명', '주소', '위치', '가동위치', '설치위치', '장소'],
       building_type: ['건물유형', '유형', 'building_type'],
       built_year: ['준공연도', '준공년도', 'built_year'],
       floors: ['건물층수', '층수', 'floors'],

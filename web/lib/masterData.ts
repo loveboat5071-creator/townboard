@@ -121,31 +121,30 @@ function cleanAddressToken(value: string): string {
 }
 
 function extractCityFromAddress(address: string): string | null {
-  const token = cleanAddressToken(address.split(/\s+/).filter(Boolean)[0] || '');
-  return token || null;
+  const tokens = address.split(/\s+/).filter(Boolean);
+  const first = tokens[0] ? cleanAddressToken(tokens[0]) : '';
+  if (/(?:특별|광역|자치)시$|도$|시$|군$/.test(first)) return first;
+  return first || null;
 }
 
 function extractDistrictFromAddress(address: string): string | null {
-  const tokens = address
-    .split(/\s+/)
-    .map(cleanAddressToken)
-    .filter(Boolean);
-
+  const tokens = address.split(/\s+/).map(cleanAddressToken).filter(Boolean);
   if (tokens.length < 2) return null;
 
-  const provinceIndex = tokens.findIndex(token =>
-    /(?:특별시|광역시|특별자치시|특별자치도|도|시)$/.test(token)
-  );
-  const start = provinceIndex >= 0 ? provinceIndex + 1 : 1;
-  const first = tokens[start];
-  const second = tokens[start + 1];
-
-  if (!first) return null;
-  if (/(?:시)$/.test(first) && second && /(?:구|군)$/.test(second)) {
-    return `${first} ${second}`;
-  }
-  if (/(?:시|군|구)$/.test(first)) {
-    return first;
+  // 패턴 1: '경기도 고양시 일산동구' -> '고양시 일산동구'
+  // 패턴 2: '서울시 강남구' -> '강남구'
+  // 패턴 3: '인천광역시 남동구' -> '남동구'
+  
+  for (let i = 0; i < Math.min(tokens.length, 3); i++) {
+    const token = tokens[i];
+    const next = tokens[i+1];
+    
+    if (/(?:시)$/.test(token) && next && /(?:구|군)$/.test(next)) {
+      return `${token} ${next}`;
+    }
+    if (/(?:구|군)$/.test(token)) {
+      return token;
+    }
   }
   return null;
 }
