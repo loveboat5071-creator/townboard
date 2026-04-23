@@ -18,8 +18,8 @@ import { aggregateByRegion } from './aggregator';
 
 let _cache: Complex[] | null = null;
 
-const BLOB_MASTER_KEY = 'focusmap/master.json';
-const BLOB_MASTER_META_KEY = 'focusmap/master.meta.json';
+const BLOB_MASTER_KEY = 'townboard/master.json';
+const BLOB_MASTER_META_KEY = 'townboard/master.meta.json';
 const BLOB_MASTER_ACCESS = process.env.MASTER_BLOB_ACCESS === 'public' ? 'public' : 'private';
 const INVALID_TEXT_VALUES = new Set(['', 'null', 'undefined', 'n/a', 'na', '-']);
 
