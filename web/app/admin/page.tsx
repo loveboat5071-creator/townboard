@@ -103,62 +103,41 @@ export default function AdminPage() {
     setUploadProgress('클라우드 저장소에 전송 중...');
 
     try {
-      console.log('--- Chunked Upload Started ---');
-      const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB
-      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-      const uploadId = `up_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      setError(''); 
+      setResult(null);
       
-      let finalUrl = '';
+      const formData = new FormData();
+      formData.append('file', file);
+      if (action === 'save') formData.append('action', 'save');
 
-      for (let i = 0; i < totalChunks; i++) {
-        const start = i * CHUNK_SIZE;
-        const end = Math.min(file.size, start + CHUNK_SIZE);
-        const chunk = file.slice(start, end);
+      console.log('--- Standard Upload Started (Focus Style) ---');
+      setUploadProgress(action === 'save' ? '데이터베이스 갱신 중...' : '파일 분석 중...');
 
-        setUploadProgress(`전송 중... (${i + 1}/${totalChunks} 조각)`);
-        console.log(`Uploading chunk ${i + 1}/${totalChunks}...`);
-
-        const resp = await fetch(`/api/upload/chunk?filename=${encodeURIComponent(file.name)}&index=${i}&total=${totalChunks}&id=${uploadId}`, {
-          method: 'POST',
-          body: chunk,
-        });
-
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.error || `조각 ${i + 1} 전송 중 오류 발생`);
-        
-        if (data.completed) {
-          finalUrl = data.url;
-        }
-      }
-
-      if (!finalUrl) throw new Error('모든 조각이 전송되었으나 저장소 주소를 받지 못했습니다.');
-
-      console.log('Chunked upload finished successfully. Blob URL:', finalUrl);
-      setUploadProgress('데이터베이스 분석 및 반영 중...');
-
-      // 2. 서버에 처리 요청 (동일하게 진행)
-      const processResp = await fetch('/api/upload/process-blob', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: finalUrl,
-          fileName: file.name
-        })
+      const resp = await fetch('/api/upload', { 
+        method: 'POST', 
+        body: formData 
       });
 
-      const data = await processResp.json();
-      if (!processResp.ok) throw new Error(data.error || 'DB 반영 단계 실패');
+      const data = await resp.json();
       
-      console.log('Full chunked workflow completed successfully!');
+      if (!resp.ok) {
+        throw new Error(data.error || `업로드 실패 (상태 코드: ${resp.status})`);
+      }
+      
+      console.log('Upload completed successfully!');
       setResult(data);
       setUploadProgress('');
-      void loadStatus();
+      
+      if (action === 'save') {
+        void loadStatus();
+      }
 
     } catch (e: any) {
-      console.error('Chunked workflow catch block:', e);
-      setError(`전송 에러: ${e.message || String(e)}`);
+      console.error('Upload error:', e);
+      setError(`업로드 에러: ${e.message || String(e)}`);
       setUploadProgress('');
     } finally {
+      setIsUploading(false);
       setIsSaving(false);
     }
   }, [file, loadStatus]);

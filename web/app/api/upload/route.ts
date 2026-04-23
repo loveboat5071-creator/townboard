@@ -181,38 +181,9 @@ function enrichWithBundledFields(records: ParsedRecord[]) {
 
 export async function POST(req: NextRequest) {
   try {
-    let file: File | null = null;
-    let action = 'save';
-    let fileName = 'upload.xlsx';
-
-    // 요청 헤더 확인
-    const contentType = req.headers.get('content-type') || '';
-    
-    if (contentType.includes('application/json')) {
-      // 클라이언트에서 Blob URL을 보낸 경우 (Direct Upload 방식)
-      const body = await req.json();
-      const fileUrl = body.url;
-      action = body.action || 'save';
-      
-      if (!fileUrl) {
-        return NextResponse.json({ error: '파일 URL이 없습니다' }, { status: 400 });
-      }
-
-      // Blob에서 파일 데이터 가져오기
-      const response = await fetch(fileUrl);
-      if (!response.ok) {
-        throw new Error(`파일을 불러오는데 실패했습니다: ${response.statusText}`);
-      }
-      
-      const blob = await response.blob();
-      fileName = fileUrl.split('/').pop() || 'upload.xlsx';
-      file = new File([blob], fileName, { type: blob.type });
-    } else {
-      // 전통적인 FormData 방식
-      const formData = await req.formData();
-      action = String(formData.get('action') || 'save');
-      file = formData.get('file') as File;
-    }
+    const formData = await req.formData();
+    const action = String(formData.get('action') || 'save');
+    const file = formData.get('file') as File;
 
     if (!file) {
       return NextResponse.json({ error: '파일이 없습니다' }, { status: 400 });
