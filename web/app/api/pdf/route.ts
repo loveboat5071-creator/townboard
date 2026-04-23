@@ -126,13 +126,6 @@ function buildPdfHtml(
   if (col('units')) sCells.push(`<td class="num">${fmt(available.reduce((s, c) => s + (c.units || 0), 0))}</td>`);
   if (col('unit_price')) sCells.push('<td></td>');
   if (col('price_4w')) sCells.push(`<td class="num">${fmt(available.reduce((s, c) => s + (c.price_4w || 0), 0))}</td>`);
-  const sumRowHtml = sCells.join('');
-></td>');
-  if (col('area_pyeong')) sCells.push('<td></td>');
-  if (col('households')) sCells.push(`<td class="num">${fmt(available.reduce((s, c) => s + (c.households || 0), 0))}</td>`);
-  if (col('units')) sCells.push(`<td class="num">${fmt(available.reduce((s, c) => s + (c.units || 0), 0))}</td>`);
-  if (col('unit_price')) sCells.push('<td></td>');
-  if (col('price_4w')) sCells.push(`<td class="num">${fmt(available.reduce((s, c) => s + (c.price_4w || 0), 0))}</td>`);
   if (colD('distance')) sCells.push('<td></td>');
   const sumRowHtml = sCells.join('');
 
