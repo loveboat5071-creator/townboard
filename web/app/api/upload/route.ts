@@ -78,6 +78,30 @@ function canUseLooseHeaderMatch(alias: string): boolean {
   return normalizeHeader(alias).length >= 3;
 }
 
+async function fetchKakaoLocationInternal(address: string, apiKey: string) {
+  try {
+    const res = await fetch(`https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(address)}`, {
+      headers: { Authorization: `KakaoAK ${apiKey}` }
+    });
+    const data = await res.json();
+    if (data?.documents?.[0]) {
+      const doc = data.documents[0];
+      return { lat: parseFloat(doc.y), lng: parseFloat(doc.x) };
+    }
+    const res2 = await fetch(`https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(address)}`, {
+      headers: { Authorization: `KakaoAK ${apiKey}` }
+    });
+    const data2 = await res2.json();
+    if (data2?.documents?.[0]) {
+      const doc = data2.documents[0];
+      return { lat: parseFloat(doc.y), lng: parseFloat(doc.x) };
+    }
+  } catch (e) {
+    console.error('Geocoding internal error:', e);
+  }
+  return null;
+}
+
 function findHeaderColumn(headers: string[], aliases: string[]): string | null {
   const normalizedAliases = aliases.map(normalizeHeader).filter(Boolean);
 
@@ -311,7 +335,8 @@ export async function POST(req: NextRequest) {
           'ev_charger_count', 'lat', 'lng',
         ];
         if (numFields.includes(field)) {
-          const num = Number(cellValue);
+          const cleaned = String(cellValue || '').replace(/[, ]/g, '');
+          const num = Number(cleaned);
           record[field] = isNaN(num) ? null : num;
         } else if (field === 'ev_charger_installed') {
           const text = String(cellValue || '').trim().toLowerCase();
@@ -348,6 +373,26 @@ export async function POST(req: NextRequest) {
         const enrichedResult = enrichWithBundledFields(records);
         enriched = enrichedResult.enriched;
         stats = enrichedResult.stats;
+
+        // 좌표가 없는 항목들에 대해 즉석 지오코딩 시도
+        const apiKey = process.env.KAKAO_API_KEY;
+        if (apiKey) {
+          console.log(`Starting on-the-fly geocoding for missing coordinates...`);
+          for (let i = 0; i < enriched.length; i++) {
+            const r = enriched[i];
+            if (r.lat == null || r.lng == null || r.lat === 0) {
+              const addr = String(r.addr_road || r.addr_parcel || '');
+              if (addr) {
+                const geo = await fetchKakaoLocationInternal(addr, apiKey);
+                if (geo) {
+                  r.lat = geo.lat;
+                  r.lng = geo.lng;
+                  stats.latLngFilled += 1;
+                }
+              }
+            }
+          }
+        }
       } catch (enrichError) {
         console.error('Enrichment failed:', enrichError);
       }
