@@ -180,10 +180,17 @@ function enrichWithBundledFields(records: ParsedRecord[]) {
 }
 
 export async function POST(req: NextRequest) {
+  console.log('--- [/api/upload] POST Request Received ---');
   try {
     const formData = await req.formData();
+    console.log('FormData parsed successfully');
     const action = String(formData.get('action') || 'save');
     const file = formData.get('file') as File;
+    if (file) {
+      console.log(`Received file: ${file.name}, Size: ${file.size} bytes`);
+    } else {
+      console.log('No file found in FormData');
+    }
 
     if (!file) {
       return NextResponse.json({ error: '파일이 없습니다' }, { status: 400 });
