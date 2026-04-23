@@ -103,22 +103,37 @@ export default function AdminPage() {
     setUploadProgress('클라우드 저장소에 전송 중...');
 
     try {
-      console.log('--- Server Streaming Upload Started ---');
-      console.log('Selected file:', file.name, 'Size:', file.size, 'bytes');
-
-      setUploadProgress('서버로 데이터 스트리밍 중...');
-
-      // 1. 서버 스트리밍 엔드포인트로 파일 전송 (4.5MB 제한 우회)
-      const streamResp = await fetch(`/api/upload/stream?filename=${encodeURIComponent(file.name)}`, {
-        method: 'POST',
-        body: file, // 파일을 바디로 직접 전달 (Streaming 시작)
-        duplex: 'half' // 최신 브라우저 통신 옵션
-      } as any);
-
-      const streamData = await streamResp.json();
-      if (!streamResp.ok) throw new Error(streamData.error || '파일 스트리밍 전송 실패');
+      console.log('--- Chunked Upload Started ---');
+      const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB
+      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+      const uploadId = `up_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       
-      console.log('Stream upload finished. Blob URL:', streamData.url);
+      let finalUrl = '';
+
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(file.size, start + CHUNK_SIZE);
+        const chunk = file.slice(start, end);
+
+        setUploadProgress(`전송 중... (${i + 1}/${totalChunks} 조각)`);
+        console.log(`Uploading chunk ${i + 1}/${totalChunks}...`);
+
+        const resp = await fetch(`/api/upload/chunk?filename=${encodeURIComponent(file.name)}&index=${i}&total=${totalChunks}&id=${uploadId}`, {
+          method: 'POST',
+          body: chunk,
+        });
+
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || `조각 ${i + 1} 전송 중 오류 발생`);
+        
+        if (data.completed) {
+          finalUrl = data.url;
+        }
+      }
+
+      if (!finalUrl) throw new Error('모든 조각이 전송되었으나 저장소 주소를 받지 못했습니다.');
+
+      console.log('Chunked upload finished successfully. Blob URL:', finalUrl);
       setUploadProgress('데이터베이스 분석 및 반영 중...');
 
       // 2. 서버에 처리 요청 (동일하게 진행)
@@ -126,7 +141,7 @@ export default function AdminPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          url: streamData.url,
+          url: finalUrl,
           fileName: file.name
         })
       });
@@ -134,13 +149,13 @@ export default function AdminPage() {
       const data = await processResp.json();
       if (!processResp.ok) throw new Error(data.error || 'DB 반영 단계 실패');
       
-      console.log('Streaming workflow completed successfully!');
+      console.log('Full chunked workflow completed successfully!');
       setResult(data);
       setUploadProgress('');
       void loadStatus();
 
     } catch (e: any) {
-      console.error('Streaming workflow catch block:', e);
+      console.error('Chunked workflow catch block:', e);
       setError(`전송 에러: ${e.message || String(e)}`);
       setUploadProgress('');
     } finally {
