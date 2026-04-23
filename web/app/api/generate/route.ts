@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
       new Set(excluded_columns.map(String))
     );
 
-    return new NextResponse(buffer, {
+    return new Response(buffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
