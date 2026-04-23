@@ -90,7 +90,7 @@ function buildPdfHtml(
     if (col('addr_road')) cells.push(`<td class="addr"><div class="cell-clamp">${escapeHtml(formatAddressWithSpaces(c.addr_road || c.addr_parcel || ''))}</div></td>`);
     if (col('building_type')) cells.push(`<td>${escapeHtml(shortType(c.building_type))}</td>`);
     if (col('built_year')) cells.push(`<td class="num">${c.built_year || '-'}</td>`);
-    if (col('area_pyeong')) cells.push(`<td class="num">${fmt(c.area_pyeong)}</td>`);
+    if (col('area_pyeong')) cells.push(`<td>${escapeHtml(String(c.area_pyeong || ''))}</td>`);
     if (col('households')) cells.push(`<td class="num">${fmt(c.households)}</td>`);
     if (col('units')) cells.push(`<td class="num">${fmt(c.units)}</td>`);
     if (col('unit_price')) cells.push(`<td class="num">${fmt(c.unit_price)}</td>`);

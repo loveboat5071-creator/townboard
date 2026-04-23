@@ -113,14 +113,14 @@ export default function ComplexTable({ complexes, excludedIds, onToggle, onToggl
                 <td>{i + 1}</td>
                 <td>{raw.building_type || '-'}</td>
                 <td style={{ fontWeight: 600 }}>{c.name}</td>
-                <td className="num">{raw.built_year ? String(raw.built_year) : '-'}</td>
+                <td className="num" style={{ whiteSpace: 'nowrap' }}>{raw.built_year ? String(raw.built_year).replace(/,/g, '') : '-'}</td>
                 <td>{c.city}</td>
                 <td>{c.district}</td>
                 <td>{c.dong}</td>
                 <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 11, color: 'var(--text-secondary)' }}>
                   {c.addr_road}
                 </td>
-                <td className="num">{fmt(raw.area_pyeong)}</td>
+                <td>{String(raw.area_pyeong || '-')}</td>
                 <td className="num">{fmt(c.households)}</td>
                 <td className="num">{fmt(c.units)}</td>
                 <td className="num">{fmt(c.unit_price)}</td>

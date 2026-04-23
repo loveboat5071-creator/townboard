@@ -622,8 +622,15 @@ export async function searchByDistrict(req: {
   let avgLat = 0;
   let avgLng = 0;
   if (matched.length > 0) {
-    avgLat = matched.reduce((s, c) => s + (c.lat || 0), 0) / matched.length;
-    avgLng = matched.reduce((s, c) => s + (c.lng || 0), 0) / matched.length;
+    const withGeo = matched.filter(c => c.lat && c.lat !== 0);
+    if (withGeo.length > 0) {
+      avgLat = withGeo.reduce((s, c) => s + (c.lat || 0), 0) / withGeo.length;
+      avgLng = withGeo.reduce((s, c) => s + (c.lng || 0), 0) / withGeo.length;
+    } else {
+      // 모든 좌표가 0인 경우 폴백 (서울 기본)
+      avgLat = 37.5665;
+      avgLng = 126.9780;
+    }
   }
 
   return {
