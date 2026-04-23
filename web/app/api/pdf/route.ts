@@ -21,20 +21,22 @@ function fmtM(n: number | null | undefined): string {
   return m >= 1 ? m.toFixed(0) : n.toLocaleString('ko-KR');
 }
 
-/** 도로명 주소에서 시/도·시/군 접두어 제거 (구·동 컬럼이 이미 있으므로) */
-function shortenAddr(addr: string): string {
-  // '경기도 구리시 …' → '…', '서울특별시 강남구 …' → '강남구 …'
-  return addr
-    .replace(/^(서울특별시|부산광역시|대구광역시|인천광역시|광주광역시|대전광역시|울산광역시|세종특별자치시|경기도|충청북도|충청남도|전라북도|전라남도|경상북도|경상남도|강원도|강원특별자치도|제주특별자치도|전북특별자치도)\s*/g, '')
-    .replace(/^\S+시\s*/g, '')
-    .trim();
-}
-
 /** 건물유형 약어 */
 function shortType(t: string): string {
+  if (!t) return '-';
   if (/아파트/.test(t)) return '아';
   if (/오피스텔/.test(t)) return '오';
   return t.charAt(0) || '-';
+}
+
+function formatAddressWithSpaces(addr: string): string {
+  if (!addr) return '';
+  if (addr.includes(' ')) return addr;
+  return addr
+    .replace(/^(서울특별시|인천광역시|경기도|부산광역시|대구광역시|광주광역시|대전광역시|울산광역시|세종특별자치시|제주특별자치도|강원도|충청북도|충청남도|전라북도|전라남도|경상북도|경상남도|북한)/, '$1 ')
+    .replace(/(시|군|구)(?! )/g, '$1 ')
+    .replace(/(읍|면|동|리|가|로|길)(?! )/g, '$1 ')
+    .trim();
 }
 
 function buildPdfHtml(
@@ -78,16 +80,14 @@ function buildPdfHtml(
   ).join('');
 
   const available = data.results.filter(r => r.restriction_status === 'available');
-  const hasRadii = data.radii && data.radii.length > 0;
 
-  // ── 컬럼 선택적 listRows ──
   const listRows = available.map((c, i) => {
-    const raw = c as any;
     const cells: string[] = [`<td>${i + 1}</td>`];
     if (col('name')) cells.push(`<td><div class="cell-clamp">${escapeHtml(c.name)}</div></td>`);
-    if (col('district')) cells.push(`<td>${escapeHtml(c.district)}</td>`);
-    if (col('dong')) cells.push(`<td>${escapeHtml(c.dong)}</td>`);
-    if (col('addr_road')) cells.push(`<td class="addr"><div class="cell-clamp">${escapeHtml(shortenAddr(c.addr_road))}</div></td>`);
+    if (col('city')) cells.push(`<td>${escapeHtml(c.city || '')}</td>`);
+    if (col('district')) cells.push(`<td>${escapeHtml(c.district || '')}</td>`);
+    if (col('dong')) cells.push(`<td>${escapeHtml(c.dong || '')}</td>`);
+    if (col('addr_road')) cells.push(`<td class="addr"><div class="cell-clamp">${escapeHtml(formatAddressWithSpaces(c.addr_road || c.addr_parcel || ''))}</div></td>`);
     if (col('building_type')) cells.push(`<td>${escapeHtml(shortType(c.building_type))}</td>`);
     if (col('built_year')) cells.push(`<td class="num">${c.built_year || '-'}</td>`);
     if (col('area_pyeong')) cells.push(`<td class="num">${fmt(c.area_pyeong)}</td>`);
@@ -95,13 +95,12 @@ function buildPdfHtml(
     if (col('units')) cells.push(`<td class="num">${fmt(c.units)}</td>`);
     if (col('unit_price')) cells.push(`<td class="num">${fmt(c.unit_price)}</td>`);
     if (col('price_4w')) cells.push(`<td class="num">${fmt(c.price_4w)}</td>`);
-    if (colD('distance')) cells.push(`<td class="num">${c.distance_km.toFixed(1)}km</td>`);
     return `<tr>${cells.join('')}</tr>`;
   }).join('');
 
-  // ── 컬럼 선택적 헤더 ──
   const hCells: string[] = ['<th>No</th>'];
   if (col('name')) hCells.push('<th>아파트명</th>');
+  if (col('city')) hCells.push('<th>지역1</th>');
   if (col('district')) hCells.push('<th>지역2</th>');
   if (col('dong')) hCells.push('<th>지역3</th>');
   if (col('addr_road')) hCells.push('<th>주소</th>');
@@ -112,17 +111,23 @@ function buildPdfHtml(
   if (col('units')) hCells.push('<th>가동수량</th>');
   if (col('unit_price')) hCells.push('<th>개별단가</th>');
   if (col('price_4w')) hCells.push('<th>단지총단가</th>');
-  if (colD('distance')) hCells.push('<th>거리</th>');
   const listHeaderHtml = hCells.join('');
 
-  // ── 컬럼 선택적 합계행 ──
   const sCells: string[] = ['<td>합  계</td>'];
   if (col('name')) sCells.push('<td></td>');
+  if (col('city')) sCells.push('<td></td>');
   if (col('district')) sCells.push('<td></td>');
   if (col('dong')) sCells.push('<td></td>');
   if (col('addr_road')) sCells.push('<td></td>');
   if (col('building_type')) sCells.push('<td></td>');
   if (col('built_year')) sCells.push('<td></td>');
+  if (col('area_pyeong')) sCells.push('<td></td>');
+  if (col('households')) sCells.push(`<td class="num">${fmt(available.reduce((s, c) => s + (c.households || 0), 0))}</td>`);
+  if (col('units')) sCells.push(`<td class="num">${fmt(available.reduce((s, c) => s + (c.units || 0), 0))}</td>`);
+  if (col('unit_price')) sCells.push('<td></td>');
+  if (col('price_4w')) sCells.push(`<td class="num">${fmt(available.reduce((s, c) => s + (c.price_4w || 0), 0))}</td>`);
+  const sumRowHtml = sCells.join('');
+></td>');
   if (col('area_pyeong')) sCells.push('<td></td>');
   if (col('households')) sCells.push(`<td class="num">${fmt(available.reduce((s, c) => s + (c.households || 0), 0))}</td>`);
   if (col('units')) sCells.push(`<td class="num">${fmt(available.reduce((s, c) => s + (c.units || 0), 0))}</td>`);
