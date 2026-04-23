@@ -81,24 +81,25 @@ export default function ComplexTable({ complexes, excludedIds, onToggle, onToggl
           <tr>
             <th style={{ width: 36 }}>☑</th>
             <th>No</th>
-            <th>단지명</th>
-            <th>주소(도로명)</th>
-            <th>구</th>
-            <th>동</th>
+            <th>구분</th>
+            <th>아파트명</th>
+            <th>입주년도</th>
+            <th>지역1</th>
+            <th>지역2</th>
+            <th>지역3</th>
+            <th>주소</th>
+            <th className="num">평형</th>
             <th className="num">세대수</th>
-            <th className="num">판매수량</th>
-            <th className="num">대당단가</th>
-            <th className="num">4주 금액</th>
-            <th className="num">공시가격</th>
-            <th className="num">공시가/㎡</th>
-            <th className="num">실거래가/㎡</th>
-            <th>전기차</th>
+            <th className="num">가동수량</th>
+            <th className="num">개별단가</th>
+            <th className="num">단지총단가</th>
             {!isDistrictMode && <th className="num">거리</th>}
           </tr>
         </thead>
         <tbody>
           {complexes.map((c, i) => {
             const isExcluded = excludedIds.has(c.id);
+            const raw = c as any; // Access all fields
             return (
               <tr key={c.id} className={isExcluded ? 'row-excluded' : undefined}>
                 <td>
@@ -110,34 +111,20 @@ export default function ComplexTable({ complexes, excludedIds, onToggle, onToggl
                   />
                 </td>
                 <td>{i + 1}</td>
-                <td style={{ fontWeight: 500 }}>{c.name}</td>
-                <td style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 12, color: 'var(--text-secondary)' }}>
-                  {c.addr_road}
-                </td>
+                <td>{raw.building_type || '-'}</td>
+                <td style={{ fontWeight: 600 }}>{c.name}</td>
+                <td className="num">{raw.built_year || '-'}</td>
+                <td>{c.city}</td>
                 <td>{c.district}</td>
                 <td>{c.dong}</td>
+                <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 11, color: 'var(--text-secondary)' }}>
+                  {c.addr_road}
+                </td>
+                <td className="num">{fmt(raw.area_pyeong)}</td>
                 <td className="num">{fmt(c.households)}</td>
                 <td className="num">{fmt(c.units)}</td>
                 <td className="num">{fmt(c.unit_price)}</td>
                 <td className="num">{fmt(c.price_4w)}</td>
-                <td className="num">{fmtM(c.public_price_median)}</td>
-                <td className="num">{fmtM(c.public_price_per_m2_median)}</td>
-                <td className="num">{fmtM(c.rt_price_per_m2_median)}</td>
-                <td>
-                  {c.ev_charger_installed ? (
-                    <span className="badge badge-success" title={c.ev_evidence_text || undefined}>설치</span>
-                  ) : c.ev_evidence_level === 'low' ? (
-                    <span
-                      className="badge"
-                      style={{ background: 'rgba(245,158,11,0.12)', color: '#b45309' }}
-                      title={c.ev_evidence_text || undefined}
-                    >
-                      근접
-                    </span>
-                  ) : (
-                    <span style={{ color: 'var(--text-muted)' }}>-</span>
-                  )}
-                </td>
                 {!isDistrictMode && <td className="num">{c.distance_km.toFixed(2)}km</td>}
               </tr>
             );

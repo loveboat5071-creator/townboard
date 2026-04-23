@@ -79,24 +79,18 @@ interface RegionSummary {
 }
 
 const EXPORT_COLUMNS: { key: string; label: string; required?: boolean }[] = [
-  { key: 'name', label: '단지명', required: true },
-  { key: 'district', label: '구' },
-  { key: 'dong', label: '동' },
-  { key: 'addr_road', label: '주소(도로명)' },
-  { key: 'building_type', label: '유형' },
-  { key: 'households', label: '세대수' },
-  { key: 'population', label: '인구수' },
-  { key: 'built_year', label: '준공' },
-  { key: 'floors', label: '층수' },
+  { key: 'building_type', label: '구분' },
+  { key: 'name', label: '아파트명', required: true },
+  { key: 'built_year', label: '입주년도' },
+  { key: 'city', label: '지역1' },
+  { key: 'district', label: '지역2' },
+  { key: 'dong', label: '지역3' },
+  { key: 'addr_road', label: '주소' },
   { key: 'area_pyeong', label: '평형' },
-  { key: 'units', label: '판매수량', required: true },
-  { key: 'unit_price', label: '대당단가' },
-  { key: 'price_4w', label: '4주 금액', required: true },
-  { key: 'public_price', label: '공시가격' },
-  { key: 'public_price_m2', label: '공시가/㎡' },
-  { key: 'rt_price_m2', label: '실거래가/㎡' },
-  { key: 'ev_charger', label: '전기차' },
-  { key: 'distance', label: '거리' },
+  { key: 'households', label: '세대수' },
+  { key: 'units', label: '가동수량', required: true },
+  { key: 'unit_price', label: '개별단가' },
+  { key: 'price_4w', label: '단지총단가', required: true },
 ];
 
 const DEFAULT_EXCLUDED_COLUMNS = new Set(['public_price', 'public_price_m2', 'rt_price_m2', 'ev_charger']);
@@ -479,11 +473,11 @@ export default function ProposalWorkspace() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>타겟(시/구)</th>
-                      <th className="num">가동 수</th>
+                      <th>타겟(지역1/2)</th>
+                      <th className="num">가동수량</th>
                       <th className="num">세대 수</th>
-                      <th className="num">대당단가</th>
-                      <th className="num">4주 금액</th>
+                      <th className="num">개별단가</th>
+                      <th className="num">단지총단가</th>
                     </tr>
                   </thead>
                   <tbody>

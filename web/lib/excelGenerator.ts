@@ -250,19 +250,16 @@ function buildSummarySheet(
 
 // key mapping: UI column key -> index into LIST_HEADERS (0-based)
 const LIST_COL_KEYS: (string | null)[] = [
-  'name', null/*city*/, 'district', 'dong', null/*addr_parcel*/, 'addr_road',
-  'building_type', 'built_year', 'floors', 'area_pyeong', 'households', 'population',
-  'units', 'unit_price', 'price_4w', 'public_price', 'public_price_m2',
-  null/*rt_price*/, 'rt_price_m2', 'ev_charger', null/*ev_evidence*/, 'distance', null/*note*/,
+  'building_type', 'name', 'built_year', 'city', 'district', 'dong', 
+  'addr_road', 'area_pyeong', 'households', 'units', 'unit_price', 'price_4w',
 ];
 
 const LIST_HEADERS = [
-  '단지명', '도시', '구', '동(법정동)', '주소(지번)', '주소(도로명)',
-  '건물유형', '준공연도', '건물층수', '기준평형', '총 세대수', '총 인구수',
-  '판매수량', '대당단가', '4주 금액', '공시가격', '공시가/㎡', '실거래가', '실거래가/㎡', '전기차', 'EV근거', '거리(km)', '비고',
+  '구분', '아파트명', '입주년도', '지역1', '지역2', '지역3', 
+  '주소', '평형', '세대수', '가동수량', '개별단가', '단지총단가',
 ];
 
-const LIST_WIDTHS = [22, 8, 12, 10, 32, 40, 8, 8, 8, 8, 10, 10, 8, 10, 12, 12, 12, 12, 12, 10, 26, 8, 10];
+const LIST_WIDTHS = [12, 22, 10, 10, 14, 12, 40, 10, 12, 12, 12, 14];
 
 function buildListSheet(
   ws: ExcelJS.Worksheet,
@@ -301,24 +298,21 @@ function buildListSheet(
 
   // Row 4+: 데이터
   let row = 4;
-  // Indices for numFmt mapping (relative to original 23-column array)
-  const origNumFmtIndices = [10, 11, 12, 13, 14, 15, 17];
-  const origDecFmtIndices = [16, 18, 21];
   for (const c of complexes) {
+    const raw = c as any;
     const allVals: (string | number | null)[] = [
-      c.name, c.city, c.district, c.dong,
-      c.addr_parcel, c.addr_road, c.building_type,
-      c.built_year, c.floors, c.area_pyeong,
-      c.households, c.population,
-      c.units, c.unit_price, c.price_4w,
-      c.public_price_median ?? null,
-      c.public_price_per_m2_median ?? null,
-      c.rt_price_median ?? null,
-      c.rt_price_per_m2_median ?? null,
-      c.ev_charger_installed ? `설치 ${c.ev_charger_count ?? 0}` : (c.ev_evidence_level === 'low' ? '근접' : null),
-      c.ev_evidence_text ?? null,
-      parseFloat(c.distance_km.toFixed(2)),
-      c.restriction_status === 'available' ? '' : '영업제한',
+      raw.building_type ?? '-',
+      c.name,
+      raw.built_year ?? '-',
+      c.city,
+      c.district,
+      c.dong,
+      c.addr_road,
+      raw.area_pyeong ?? '-',
+      c.households,
+      c.units,
+      c.unit_price,
+      c.price_4w,
     ];
     // Filter vals by visible indices
     const vals = allVals.filter((_, i) => visibleIndices[i]);
@@ -327,11 +321,9 @@ function buildListSheet(
       cell.value = v as ExcelJS.CellValue;
       cell.font = VALUE_FONT;
       cell.border = BORDERS;
-      // Map original index back to check numFmt
-      const origIdx = visibleIndices.reduce((count, vis, j) => {
-        if (j < visibleIndices.length && vis) count++;
-        return count;
-      }, -1); // simplified: skip numFmt for filtered columns
+      if (typeof v === 'number') {
+        cell.numFmt = NUM_FMT;
+      }
     });
     row++;
   }
@@ -346,14 +338,18 @@ function buildListSheet(
   visibleIndices.forEach((vis, origI) => {
     if (vis) { visIdxMap.set(origI, vi + 2); vi++; }
   });
-  if (visIdxMap.has(10)) { ws.getCell(row, visIdxMap.get(10)!).value = complexes.reduce((s, c) => s + (c.households || 0), 0); }
-  if (visIdxMap.has(11)) { ws.getCell(row, visIdxMap.get(11)!).value = complexes.reduce((s, c) => s + (c.population || 0), 0); }
-  if (visIdxMap.has(12)) { ws.getCell(row, visIdxMap.get(12)!).value = complexes.reduce((s, c) => s + (c.units || 0), 0); }
-  if (visIdxMap.has(14)) { ws.getCell(row, visIdxMap.get(14)!).value = complexes.reduce((s, c) => s + (c.price_4w || 0), 0); }
+  if (visIdxMap.has(8)) { ws.getCell(row, visIdxMap.get(8)!).value = complexes.reduce((s, c) => s + (c.households || 0), 0); }
+  if (visIdxMap.has(9)) { ws.getCell(row, visIdxMap.get(9)!).value = complexes.reduce((s, c) => s + (c.units || 0), 0); }
+  if (visIdxMap.has(11)) { ws.getCell(row, visIdxMap.get(11)!).value = complexes.reduce((s, c) => s + (c.price_4w || 0), 0); }
+  
   for (let c = 2; c <= headers.length + 1; c++) {
     ws.getCell(row, c).fill = SUM_FILL;
     ws.getCell(row, c).font = { ...VALUE_FONT, bold: true };
     ws.getCell(row, c).border = BORDERS;
+    const cellValue = ws.getCell(row, c).value;
+    if (cellValue && typeof cellValue === 'number') {
+      ws.getCell(row, c).numFmt = NUM_FMT;
+    }
   }
 
   // 인쇄 설정
