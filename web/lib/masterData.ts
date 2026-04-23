@@ -557,8 +557,16 @@ export async function searchByDistrict(req: {
   const available = matched.filter(m => m.restriction_status === 'available');
   const summaries = aggregateByRegion(available);
 
+  // 구 단위 검색 시 지도가 해당 지역을 비추도록 마커들의 평균 좌표 계산
+  let avgLat = 0;
+  let avgLng = 0;
+  if (matched.length > 0) {
+    avgLat = matched.reduce((s, c) => s + (c.lat || 0), 0) / matched.length;
+    avgLng = matched.reduce((s, c) => s + (c.lng || 0), 0) / matched.length;
+  }
+
   return {
-    center: { lat: 0, lng: 0, address: districts.join(', ') },
+    center: { lat: avgLat, lng: avgLng, address: districts.join(', ') },
     radii: [],
     results: matched,
     summaries,

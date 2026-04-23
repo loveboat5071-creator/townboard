@@ -82,47 +82,36 @@ function buildPdfHtml(
 
   // ── 컬럼 선택적 listRows ──
   const listRows = available.map((c, i) => {
+    const raw = c as any;
     const cells: string[] = [`<td>${i + 1}</td>`];
     if (col('name')) cells.push(`<td><div class="cell-clamp">${escapeHtml(c.name)}</div></td>`);
     if (col('district')) cells.push(`<td>${escapeHtml(c.district)}</td>`);
     if (col('dong')) cells.push(`<td>${escapeHtml(c.dong)}</td>`);
     if (col('addr_road')) cells.push(`<td class="addr"><div class="cell-clamp">${escapeHtml(shortenAddr(c.addr_road))}</div></td>`);
     if (col('building_type')) cells.push(`<td>${escapeHtml(shortType(c.building_type))}</td>`);
-    if (col('households')) cells.push(`<td class="num">${fmt(c.households)}</td>`);
-    if (col('population')) cells.push(`<td class="num">${fmt(c.population)}</td>`);
     if (col('built_year')) cells.push(`<td class="num">${c.built_year || '-'}</td>`);
-    if (col('floors')) cells.push(`<td class="num">${c.floors || '-'}</td>`);
     if (col('area_pyeong')) cells.push(`<td class="num">${c.area_pyeong || '-'}</td>`);
+    if (col('households')) cells.push(`<td class="num">${fmt(c.households)}</td>`);
     if (col('units')) cells.push(`<td class="num">${fmt(c.units)}</td>`);
     if (col('unit_price')) cells.push(`<td class="num">${fmt(c.unit_price)}</td>`);
     if (col('price_4w')) cells.push(`<td class="num">${fmt(c.price_4w)}</td>`);
-    if (col('public_price')) cells.push(`<td class="num">${fmtM(c.public_price_median)}</td>`);
-    if (col('public_price_m2')) cells.push(`<td class="num">${fmtM(c.public_price_per_m2_median)}</td>`);
-    if (col('rt_price_m2')) cells.push(`<td class="num">${fmtM(c.rt_price_per_m2_median)}</td>`);
-    if (col('ev_charger')) cells.push(`<td>${c.ev_charger_installed ? '\u2705' : '-'}</td>`);
     if (colD('distance')) cells.push(`<td class="num">${c.distance_km.toFixed(1)}km</td>`);
     return `<tr>${cells.join('')}</tr>`;
   }).join('');
 
   // ── 컬럼 선택적 헤더 ──
   const hCells: string[] = ['<th>No</th>'];
-  if (col('name')) hCells.push('<th>단지명</th>');
-  if (col('district')) hCells.push('<th>구</th>');
-  if (col('dong')) hCells.push('<th>동</th>');
-  if (col('addr_road')) hCells.push('<th>주소(도로명)</th>');
-  if (col('building_type')) hCells.push('<th>유형</th>');
-  if (col('households')) hCells.push('<th>세대수</th>');
-  if (col('population')) hCells.push('<th>인구수</th>');
-  if (col('built_year')) hCells.push('<th>준공</th>');
-  if (col('floors')) hCells.push('<th>층수</th>');
+  if (col('name')) hCells.push('<th>아파트명</th>');
+  if (col('district')) hCells.push('<th>지역2</th>');
+  if (col('dong')) hCells.push('<th>지역3</th>');
+  if (col('addr_road')) hCells.push('<th>주소</th>');
+  if (col('building_type')) hCells.push('<th>구분</th>');
+  if (col('built_year')) hCells.push('<th>입주년도</th>');
   if (col('area_pyeong')) hCells.push('<th>평형</th>');
-  if (col('units')) hCells.push('<th>판매수량</th>');
-  if (col('unit_price')) hCells.push('<th>대당단가</th>');
-  if (col('price_4w')) hCells.push('<th>4주 금액</th>');
-  if (col('public_price')) hCells.push('<th>공시가</th>');
-  if (col('public_price_m2')) hCells.push('<th>공시가/㎡</th>');
-  if (col('rt_price_m2')) hCells.push('<th>실거래가/㎡</th>');
-  if (col('ev_charger')) hCells.push('<th>전기차</th>');
+  if (col('households')) hCells.push('<th>세대수</th>');
+  if (col('units')) hCells.push('<th>가동수량</th>');
+  if (col('unit_price')) hCells.push('<th>개별단가</th>');
+  if (col('price_4w')) hCells.push('<th>단지총단가</th>');
   if (colD('distance')) hCells.push('<th>거리</th>');
   const listHeaderHtml = hCells.join('');
 
@@ -133,18 +122,12 @@ function buildPdfHtml(
   if (col('dong')) sCells.push('<td></td>');
   if (col('addr_road')) sCells.push('<td></td>');
   if (col('building_type')) sCells.push('<td></td>');
-  if (col('households')) sCells.push(`<td class="num">${fmt(available.reduce((s, c) => s + (c.households || 0), 0))}</td>`);
-  if (col('population')) sCells.push(`<td class="num">${fmt(available.reduce((s, c) => s + (c.population || 0), 0))}</td>`);
   if (col('built_year')) sCells.push('<td></td>');
-  if (col('floors')) sCells.push('<td></td>');
   if (col('area_pyeong')) sCells.push('<td></td>');
+  if (col('households')) sCells.push(`<td class="num">${fmt(available.reduce((s, c) => s + (c.households || 0), 0))}</td>`);
   if (col('units')) sCells.push(`<td class="num">${fmt(available.reduce((s, c) => s + (c.units || 0), 0))}</td>`);
   if (col('unit_price')) sCells.push('<td></td>');
   if (col('price_4w')) sCells.push(`<td class="num">${fmt(available.reduce((s, c) => s + (c.price_4w || 0), 0))}</td>`);
-  if (col('public_price')) sCells.push('<td></td>');
-  if (col('public_price_m2')) sCells.push('<td></td>');
-  if (col('rt_price_m2')) sCells.push('<td></td>');
-  if (col('ev_charger')) sCells.push('<td></td>');
   if (colD('distance')) sCells.push('<td></td>');
   const sumRowHtml = sCells.join('');
 
@@ -312,8 +295,8 @@ function buildPdfHtml(
 <table>
   <thead>
     <tr>
-      <th>광고상품</th><th>타겟</th><th>가동 수</th><th>세대 수</th>
-      <th>대당단가</th><th>청약금액/월</th><th>할인률</th><th>비고</th>
+      <th>광고상품</th><th>타겟</th><th>가동수량</th><th>세대 수</th>
+      <th>개별단가</th><th>단지총단가</th><th>할인률</th><th>비고</th>
     </tr>
   </thead>
   <tbody>
