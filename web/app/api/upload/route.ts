@@ -214,9 +214,9 @@ export async function POST(req: NextRequest) {
 
     // 헤더 자동 감지 (1~10행 스캔)
     const knownHeaders = [
-      '단지명', '아파트명', '도시', '구', '동', '세대수', '판매수량', '대당단가', '위도', '경도',
+      '단지명', '아파트명', '도시', '시도', '구', '군', '동', '읍', '면', '세대수', '판매수량', '대당단가', '위도', '경도',
       '도로명주소', '건물유형', '주소(지번)', '주소(도로명)', '총 세대수', '총 인구수', '4주 금액',
-      '공시가격', '공시가/㎡', '실거래가/㎡', '전기차', 'name', 'households', 'units',
+      '공시가격', '공시가/㎡', '실거래가/㎡', '전기차', 'name', 'households', 'units', '명칭', '주소', '업소수'
     ];
     let headerRowNum = 1;
     const headers: string[] = [];
@@ -254,19 +254,19 @@ export async function POST(req: NextRequest) {
     // 컬럼 매핑
     const colMap: Record<string, string> = {};
     const mapping: Record<string, string[]> = {
-      name: ['단지명', '아파트명', 'name', '명칭'],
+      name: ['단지명', '아파트명', 'name', '명칭', '가동명', '리스트'],
       city: ['도시', '시도', '시', 'city'],
       district: ['시군구', '구군', '구', 'district'],
-      dong: ['동', '법정동', 'dong'],
+      dong: ['동', '법정동', 'dong', '읍', '면'],
       addr_parcel: ['지번주소', '주소(지번)', '주소_지번', 'addr_parcel'],
-      addr_road: ['도로명주소', '주소(도로명)', '주소_도로명', 'addr_road', '도로명'],
+      addr_road: ['도로명주소', '주소(도로명)', '주소_도로명', 'addr_road', '도로명', '주소'],
       building_type: ['건물유형', '유형', 'building_type'],
       built_year: ['준공연도', '준공년도', 'built_year'],
       floors: ['건물층수', '층수', 'floors'],
       area_pyeong: ['기준평형', '평형', 'area_pyeong'],
       households: ['총세대수', '세대수', 'households', '총 세대수'],
       population: ['총인구수', '인구수', 'population', '총 인구수'],
-      units: ['판매수량', '판매', 'units'],
+      units: ['판매수량', '판매', 'units', '업소수', '가동수'],
       unit_price: ['대당단가', '단가', 'unit_price'],
       price_4w: ['4주금액', '4주 금액', 'price_4w'],
       premium: ['프리미엄', 'premium'],
