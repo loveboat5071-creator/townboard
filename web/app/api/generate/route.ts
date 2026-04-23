@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       {
         message: String(creative_message),
         asset_kinds: creative_asset_kinds as CreativeAssetKind[],
-        format: creative_format as any,
+        preferred_format: creative_format as any,
         audio_mode: creative_audio_mode as any,
       },
       new Set(excluded_columns.map(String))
