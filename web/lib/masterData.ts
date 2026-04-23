@@ -16,6 +16,24 @@ import { classifyByRadius, haversineDistance } from './haversine';
 import { checkRestriction } from './restriction';
 import { aggregateByRegion } from './aggregator';
 
+async function fetchKakaoLocationInternal(address: string) {
+  const apiKey = process.env.KAKAO_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const res = await fetch(`https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(address)}`, {
+      headers: { Authorization: `KakaoAK ${apiKey}` }
+    });
+    const data = await res.json();
+    if (data?.documents?.[0]) {
+      const doc = data.documents[0];
+      return { lat: parseFloat(doc.y), lng: parseFloat(doc.x) };
+    }
+  } catch (e) {
+    console.warn('Real-time geocoding failed:', e);
+  }
+  return null;
+}
+
 let _cache: Complex[] | null = null;
 
 const BLOB_MASTER_KEY = 'townboard/master.json';
@@ -451,12 +469,26 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
   const matched: MatchedComplex[] = [];
 
   for (const complex of data) {
+    // 좌표가 없는 경우 실시간 보정
+    if (complex.lat == null || complex.lat === 0 || complex.lat === 37.5665) {
+      const addr = complex.addr_road || complex.addr_parcel || '';
+      if (addr) {
+        // 모든 아파트를 다 지오코딩하면 속도가 느려지므로, 시/도 정도만 간단히 확인하거나 일단 시도
+        const geo = await fetchKakaoLocationInternal(addr);
+        if (geo) {
+          complex.lat = geo.lat;
+          complex.lng = geo.lng;
+        }
+      }
+    }
+
     if (
       typeof complex.lat !== 'number' ||
       typeof complex.lng !== 'number' ||
       !Number.isFinite(complex.lat) ||
       !Number.isFinite(complex.lng)
     ) continue;
+
     if (districtSet.size > 0 && !districtSet.has(normalizeFilterText(complex.district))) {
       continue;
     }
@@ -471,8 +503,15 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
     const classified = classifyByRadius(dist, radii);
     if (!classified) continue;
 
+    // 단지총단가 실시간 복구
+    let finalPrice = Number(complex.price_4w || 0);
+    if (finalPrice <= 0) {
+      finalPrice = Number(complex.units || 0) * Number(complex.unit_price || 0);
+    }
+
     matched.push({
       ...complex,
+      price_4w: finalPrice,
       distance_km: classified.distance_km,
       radius_band: classified.radius_band,
       restriction_status: restrictionStatus,
@@ -537,10 +576,29 @@ export async function searchByDistrict(req: {
     if (!districtSet.has(normalizeFilterText(complex.district))) continue;
     if (require_ev && !complex.ev_charger_installed) continue;
 
+    // 좌표가 없는 경우 실시간 보정
+    if (complex.lat == null || complex.lat === 0 || complex.lat === 37.5665) {
+      const addr = complex.addr_road || complex.addr_parcel || '';
+      if (addr) {
+        const geo = await fetchKakaoLocationInternal(addr);
+        if (geo) {
+          complex.lat = geo.lat;
+          complex.lng = geo.lng;
+        }
+      }
+    }
+
     const restrictionStatus = checkRestriction(complex, advertiser_industry, campaignDateObj);
+
+    // 단지총단가 실시간 복구 (누락된 경우 계산)
+    let finalPrice = Number(complex.price_4w || 0);
+    if (finalPrice <= 0) {
+      finalPrice = Number(complex.units || 0) * Number(complex.unit_price || 0);
+    }
 
     matched.push({
       ...complex,
+      price_4w: finalPrice,
       distance_km: 0,
       radius_band: 0,
       restriction_status: restrictionStatus,
