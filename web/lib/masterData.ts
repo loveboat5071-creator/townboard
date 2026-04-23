@@ -17,8 +17,11 @@ import { checkRestriction } from './restriction';
 import { aggregateByRegion } from './aggregator';
 
 async function fetchKakaoLocationInternal(address: string) {
-  const apiKey = process.env.KAKAO_API_KEY;
-  if (!apiKey) return null;
+  const apiKey = (process.env.KAKAO_API_KEY || '').trim();
+  if (!apiKey) {
+    console.error('[InternalGeo] KAKAO_API_KEY is missing! Cannot geocode: ' + address);
+    return null;
+  }
   try {
     const res = await fetch(`https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(address)}`, {
       headers: { Authorization: `KakaoAK ${apiKey}` }

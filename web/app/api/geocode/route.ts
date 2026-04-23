@@ -280,6 +280,9 @@ export async function GET(req: NextRequest) {
   }
 
   const apiKey = (process.env.KAKAO_API_KEY || '').trim();
+  if (!apiKey) {
+    console.warn('[Geocode] KAKAO_API_KEY is missing from process.env. Please check Vercel environment variables.');
+  }
 
   // ── 1. 카카오 API ──
   if (apiKey) {
