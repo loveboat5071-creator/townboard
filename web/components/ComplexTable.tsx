@@ -99,7 +99,7 @@ export default function ComplexTable({ complexes, excludedIds, onToggle, onToggl
         <tbody>
           {complexes.map((c, i) => {
             const isExcluded = excludedIds.has(c.id);
-            const raw = c as any; // Access all fields
+            const raw = c as any;
             return (
               <tr key={c.id} className={isExcluded ? 'row-excluded' : undefined}>
                 <td>
@@ -113,7 +113,7 @@ export default function ComplexTable({ complexes, excludedIds, onToggle, onToggl
                 <td>{i + 1}</td>
                 <td>{raw.building_type || '-'}</td>
                 <td style={{ fontWeight: 600 }}>{c.name}</td>
-                <td className="num">{raw.built_year || '-'}</td>
+                <td className="num">{raw.built_year ? String(raw.built_year) : '-'}</td>
                 <td>{c.city}</td>
                 <td>{c.district}</td>
                 <td>{c.dong}</td>
@@ -124,12 +124,22 @@ export default function ComplexTable({ complexes, excludedIds, onToggle, onToggl
                 <td className="num">{fmt(c.households)}</td>
                 <td className="num">{fmt(c.units)}</td>
                 <td className="num">{fmt(c.unit_price)}</td>
-                <td className="num">{fmt(c.price_4w)}</td>
+                <td className="num" style={{ fontWeight: 600 }}>{fmt(c.price_4w)}</td>
                 {!isDistrictMode && <td className="num">{c.distance_km.toFixed(2)}km</td>}
               </tr>
             );
           })}
         </tbody>
+        <tfoot style={{ position: 'sticky', bottom: 0, background: 'var(--bg-card)', fontWeight: 800 }}>
+          <tr style={{ borderTop: '2px solid var(--border)' }}>
+            <td colSpan={10} style={{ textAlign: 'center' }}>합 계</td>
+            <td className="num">{fmt(complexes.filter(c => !excludedIds.has(c.id)).reduce((s, c) => s + (c.households || 0), 0))}</td>
+            <td className="num">{fmt(complexes.filter(c => !excludedIds.has(c.id)).reduce((s, c) => s + (c.units || 0), 0))}</td>
+            <td></td>
+            <td className="num" style={{ color: 'var(--accent)' }}>{fmt(complexes.filter(c => !excludedIds.has(c.id)).reduce((s, c) => s + (c.price_4w || 0), 0))}</td>
+            {!isDistrictMode && <td></td>}
+          </tr>
+        </tfoot>
       </table>
     </div>
   );

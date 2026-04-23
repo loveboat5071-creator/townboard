@@ -348,6 +348,15 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // 단지총단가 자동 계산 (가동수량 * 개별단가)
+      if (!record.price_4w || record.price_4w === 0) {
+        const units = Number(record.units || 0);
+        const unitPrice = Number(record.unit_price || 0);
+        if (units > 0 && unitPrice > 0) {
+          record.price_4w = units * unitPrice;
+        }
+      }
+
       if (hasData && record.name) {
         if (!record.city) record.city = '서울특별시';
         if (!record.building_type) record.building_type = '아파트';
@@ -377,10 +386,11 @@ export async function POST(req: NextRequest) {
         // 좌표가 없는 항목들에 대해 즉석 지오코딩 시도
         const apiKey = process.env.KAKAO_API_KEY;
         if (apiKey) {
-          console.log(`Starting on-the-fly geocoding for missing coordinates...`);
+          console.log(`Starting geocoding for ${enriched.length} records...`);
+          let successCount = 0;
           for (let i = 0; i < enriched.length; i++) {
             const r = enriched[i];
-            if (r.lat == null || r.lng == null || r.lat === 0) {
+            if (r.lat == null || r.lng == null || r.lat === 0 || r.lat === 37.5665) {
               const addr = String(r.addr_road || r.addr_parcel || '');
               if (addr) {
                 const geo = await fetchKakaoLocationInternal(addr, apiKey);
@@ -388,10 +398,14 @@ export async function POST(req: NextRequest) {
                   r.lat = geo.lat;
                   r.lng = geo.lng;
                   stats.latLngFilled += 1;
+                  successCount++;
                 }
+                // Rate limit 방지 (매 5건마다 짧은 휴식)
+                if (i % 5 === 0) await new Promise(res => setTimeout(res, 50));
               }
             }
           }
+          console.log(`Geocoding finished. Filled ${successCount} coordinates.`);
         }
       } catch (enrichError) {
         console.error('Enrichment failed:', enrichError);
