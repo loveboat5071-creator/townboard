@@ -311,6 +311,7 @@ export default function ProposalWorkspace() {
         });
         
         const searchData = await searchResp.json();
+        setResult(searchData); // 에러 발생 시에도 진단 데이터(debug_total_scanned)를 화면에 남기기 위해 호출
         
         if (!searchResp.ok) {
           setError(searchData.error || '검색 중 오류가 발생했습니다.');
