@@ -277,18 +277,22 @@ export default function ProposalWorkspace() {
           return;
         }
 
-        // [District Extraction Fallback] 지도 엔진이 구 이름을 못 찾으면 텍스트에서 직접 추출
-        const districtMatches = address.match(/(\S+(?:시|군|구))/g) || [];
+        // [Simplified District Extraction] 주소에서 '구/군' 단위만 추출하여 정밀 타격
+        const districtMatches = address.match(/(\S+(?:구|군))/g) || [];
         const searchDistricts = [...districtMatches];
         if (geoData.district && !searchDistricts.includes(geoData.district)) {
           searchDistricts.push(geoData.district);
         }
+        
+        // 검색어가 너무 광범위해지는 것을 막기 위해 '시' 단위(인천 등)는 명시적으로 제거
+        const cleanedDistricts = searchDistricts.filter(d => !d.endsWith('시'));
+        const finalRequestDistricts = cleanedDistricts.length > 0 ? cleanedDistricts : searchDistricts;
 
         const searchResp = await fetch('/api/search-district', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            districts: searchDistricts,
+            districts: finalRequestDistricts,
             require_ev: requireEvOnly,
             sort_by: sortBy,
             advertiser_industry: advertiserIndustry || undefined,

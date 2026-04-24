@@ -497,44 +497,32 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
   for (const complex of data) {
     if (require_ev && !complex.ev_charger_installed) continue;
 
+    // [Simplified Search] 사용자 주소 기반 구(District) 이름이 일치하거나 옛 명칭인 경우만 통과
     const complexDistrict = normalizeFilterText(complex.district || '');
-    const complexCity = normalizeFilterText(complex.city || '');
-    const searchCity = address.split(/\s+/)[0] ? normalizeFilterText(address.split(/\s+/)[0]) : '';
-
-    // [District Filter] 반경 검색 시에도 일단 해당 '구' 데이터만 가져와서 브라우저 부하 방지
-    const isSameDistrict = complexDistrict && targetDistrict && (complexDistrict.includes(targetDistrict) || targetDistrict.includes(complexDistrict));
-    const isNearByGu = (targetDistrict === '미추홀구' && complexDistrict === '남구') || (targetDistrict === '남구' && complexDistrict === '미추홀구');
-    
-    if (!(isSameDistrict || isNearByGu)) {
-      // 도시 이름이라도 같으면 일단 통과 (필요 시 더 넓게 볼 수도 있음)
-      if (!(complexCity && searchCity && (complexCity.includes(searchCity) || searchCity.includes(complexCity)))) {
-        continue;
-      }
-      // 하지만 너무 멀리 있는 광역 매칭은 '구' 필터가 있을 때 무시
-      if (targetDistrict) continue;
-    }
-
-    // 좌표가 없더라도 선택한 행정구역(targetDistrict)에 속한다면 일단 포함 (클라이언트에서 복구할 기회를 줌)
     const isTargetDistrict = complexDistrict && targetDistrict && (
-      complexDistrict.includes(targetDistrict) || 
+      complexDistrict === targetDistrict ||
+      complexDistrict.includes(targetDistrict) ||
       targetDistrict.includes(complexDistrict) ||
       (targetDistrict === '미추홀구' && complexDistrict === '남구') ||
       (targetDistrict === '남구' && complexDistrict === '미추홀구')
     );
     
-    if (
-      (typeof complex.lat !== 'number' ||
-      typeof complex.lng !== 'number' ||
-      !Number.isFinite(complex.lat) ||
-      !Number.isFinite(complex.lng) ||
-      complex.lat === 0) && !isTargetDistrict
-    ) continue;
+    // 주소에서 구 이름을 찾았는데, 아파트가 다른 구에 속한다면 과감히 제외 (과부하 방지)
+    if (targetDistrict && !isTargetDistrict) continue;
 
-    // 좌표가 있는 경우에만 거리 계산. 없으면 0으로 일단 처리
+    // 만약 구 이름이 없는 광역 주소라면 최소한 도시명(인천 등)은 같아야 함
+    const complexCity = normalizeFilterText(complex.city || '');
+    const searchCity = address.split(/\s+/)[0] ? normalizeFilterText(address.split(/\s+/)[0]) : '';
+    if (!targetDistrict && !(complexCity && searchCity && (complexCity.includes(searchCity) || searchCity.includes(complexCity)))) {
+      continue;
+    }
+
+    // 거리는 일단 0으로 주고 클라이언트에서 도로명 주소/좌표 기반 정밀 계산 추진
+    // 단, DB에 이미 좌표가 있는 경우엔 서버에서 미리 계산하여 초기 속도 향상
     const hasLat = !!(complex.lat && complex.lat !== 0 && complex.lat !== 37.5665 && complex.lng);
     const dist = hasLat ? haversineDistance(lat, lng, complex.lat as number, complex.lng as number) : 0;
     
-    // 좌표가 있는 경우에만 반경 필터링 수행. 좌표 없으면 일단 통과(클라이언트가 나중에 거름)
+    // 좌표가 이미 있는 아파트가 반경 밖에 있다면 과감히 초기 단계에서 제외
     if (hasLat && dist > maxRadius) continue;
 
     const restrictionStatus = checkRestriction(complex, advertiser_industry, campaignDateObj);
