@@ -504,10 +504,11 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
       continue;
     }
 
+    const complexCity = normalizeFilterText(complex.city || '');
+    const searchCity = address.split(/\s+/)[0] ? normalizeFilterText(address.split(/\s+/)[0]) : '';
+
     // [Optimized Geocoding] 좌표가 없는데 반경 내에 있을 가능성이 있는 경우 복구
     if (complex.lat == null || complex.lat === 0 || complex.lat === 37.5665) {
-      const complexCity = normalizeFilterText(complex.city || '');
-      const searchCity = address.split(/\s+/)[0] ? normalizeFilterText(address.split(/\s+/)[0]) : '';
       
       // 검색 주소의 도시(예: 인천)와 아파트의 도시가 일치하는 경우에만 추진
       if (complexCity && searchCity && (complexCity.includes(searchCity) || searchCity.includes(complexCity))) {
