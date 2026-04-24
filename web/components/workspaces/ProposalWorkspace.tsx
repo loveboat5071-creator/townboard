@@ -321,109 +321,38 @@ export default function ProposalWorkspace() {
           item.area_pyeong = formatPyeong(item.area_pyeong);
         });
         
-        // [Distance Pre-calculation] 이미 좌표가 있는 아파트들은 미리 거리를 계산하여 '인천 전체' 노출 방지
-        const win = window as any;
-        const getDist = (lat1: number, lng1: number, lat2: number, lng2: number) => {
-          if (!lat1 || !lng1 || !lat2 || !lng2) return 999;
-          const R = 6371;
-          const dLat = (lat2 - lat1) * Math.PI / 180;
-          const dLng = (lng2 - lng1) * Math.PI / 180;
-          const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                    Math.sin(dLng / 2) * Math.sin(dLng / 2);
-          return R * 2 * Math.asin(Math.sqrt(a));
-        };
-
-        const initialResults = searchData.results.map((item: any) => {
-          const lat = parseFloat(String(item.lat || '0'));
-          const lng = parseFloat(String(item.lng || '0'));
-          item.area_pyeong = formatPyeong(item.area_pyeong);
-          if (lat > 0 && lat !== 37.5665) {
-            item.distance_km = getDist(centerLat, centerLng, lat, lng);
-          } else {
-            item.distance_km = 0; // 복구 전까지는 일단 보임
-          }
-          return item;
+        // [Original App Strategy] 서버의 /api/search를 직접 호출하여 단 한 번에 완벽한 결과를 가져옴
+        const searchResp = await fetch('/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lat: centerLat,
+            lng: centerLng,
+            address: address.trim(),
+            radii: selectedRadii,
+            districts: searchDistricts,
+            require_ev: requireEvOnly,
+            sort_by: sortBy,
+            advertiser_industry: advertiserIndustry || undefined,
+            campaign_date: new Date().toISOString().split('T')[0], // 오늘 날짜 기준
+            advertiser_name: advertiserName || undefined,
+            campaign_name: campaignName || undefined,
+          }),
         });
+        
+        const searchData = await searchResp.json();
+        
+        if (!searchResp.ok) {
+          setError(searchData.error || '검색 중 오류가 발생했습니다.');
+          return;
+        }
 
-        // [Recalculation Helper] 필터링된 결과로 요약 및 통계 재계산
-        const recalculateAll = (filtered: any[]) => {
-          const summaryMap: Record<string, any> = {};
-          filtered.forEach((item: any) => {
-            const key = `${item.city || ''}_${item.district || ''}`;
-            if (!summaryMap[key]) {
-              summaryMap[key] = { city: item.city || '', district: item.district || '', count: 0, total_households: 0, total_units: 0, total_price_4w: 0, total_unit_price: 0 };
-            }
-            summaryMap[key].count++;
-            summaryMap[key].total_households += (item.households || 0);
-            summaryMap[key].total_units += (item.units || 0);
-            summaryMap[key].total_price_4w += (item.price_4w || 0);
-            summaryMap[key].total_unit_price += (item.unit_price || 0);
-          });
-          return {
-            summaries: Object.values(summaryMap).map((s: any) => ({ ...s, avg_unit_price: s.count > 0 ? Math.round(s.total_unit_price / s.count) : 0 })),
-            total_count: filtered.length,
-            total_households: filtered.reduce((acc, cur) => acc + (cur.households || 0), 0),
-            total_units: filtered.reduce((acc, cur) => acc + (cur.units || 0), 0),
-            total_price_4w: filtered.reduce((acc, cur) => acc + (cur.price_4w || 0), 0),
-          };
-        };
-
-        // 초기 필터링 적용 (이미 거리 아는 것들 기준)
-        const initialFiltered = initialResults.filter((item: any) => {
-          if (!item.lat || item.lat === 0 || item.lat === 37.5665) return true;
-          return (item.distance_km || 0) <= maxRadiusKm;
-        });
-        const initialStats = recalculateAll(initialFiltered);
-
-        setResult({ 
-          ...searchData, 
-          ...initialStats,
-          results: initialFiltered.sort((a: any, b: any) => (a.distance_km || 999) - (b.distance_km || 999)),
+        // 결과 반영
+        setResult({
+          ...searchData,
           center: { lat: centerLat, lng: centerLng, address: address.trim() },
           radii: selectedRadii
         });
-
-        // [Background Geocoding & Refinement]
-        const geocoder = win.kakao?.maps?.services ? new win.kakao.maps.services.Geocoder() : null;
-        const batchSize = 15;
-        let finalResults = [...initialResults];
-
-        for (let i = 0; i < finalResults.length; i += batchSize) {
-          const batch = finalResults.slice(i, i + batchSize);
-          await Promise.all(batch.map((item: any) => {
-            return new Promise<void>((resolve) => {
-              const currentLat = parseFloat(String(item.lat || '0'));
-              if (geocoder && (!currentLat || currentLat <= 0 || currentLat === 37.5665)) {
-                const q = (item.addr_road || item.addr_parcel || `${item.city || ''} ${item.district || ''} ${item.name}`).trim();
-                geocoder.addressSearch(q, (res: any, status: any) => {
-                  if (status === win.kakao.maps.services.Status.OK && res[0]) {
-                    item.lat = parseFloat(res[0].y);
-                    item.lng = parseFloat(res[0].x);
-                  }
-                  item.distance_km = getDist(centerLat, centerLng, item.lat, item.lng);
-                  resolve();
-                });
-              } else {
-                // 이미 위에서 계산함
-                resolve();
-              }
-            });
-          }));
-          
-          const currentFiltered = finalResults.filter((item: any) => {
-            if (!item.lat || item.lat === 0 || item.lat === 37.5665) return true; 
-            return (item.distance_km || 0) <= maxRadiusKm;
-          });
-          const stats = recalculateAll(currentFiltered);
-          setResult(prev => prev ? { 
-            ...prev, 
-            ...stats,
-            results: [...currentFiltered].sort((a: any, b: any) => (a.distance_km || 999) - (b.distance_km || 999)) 
-          } : null);
-          
-          if (i + batchSize < finalResults.length) await new Promise(r => setTimeout(r, 100));
-        }
       } else {
         let effectiveDistricts = selectedDistricts;
 
