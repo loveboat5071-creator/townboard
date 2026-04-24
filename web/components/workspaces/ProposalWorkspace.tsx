@@ -216,7 +216,7 @@ export default function ProposalWorkspace() {
       if (searchMode === 'radius') {
         if (!address.trim()) { setError('주소를 입력해주세요.'); return; }
         if (selectedRadii.length === 0) { setError('최소 하나의 반경을 선택해주세요.'); return; }
-        let geoData: { lat: number; lng: number; error?: string };
+        let geoData: { lat: number; lng: number; district?: string; error?: string };
         const geoResp = await fetch(`/api/geocode?address=${encodeURIComponent(address)}`);
         const serverGeo = await geoResp.json();
 
@@ -226,10 +226,16 @@ export default function ProposalWorkspace() {
           // [Client-side Fallback] 서버 지오코딩 실패 시 브라우저에서 직접 시도
           const win = window as any;
           const geocoder = new win.kakao.maps.services.Geocoder();
-          const clientGeo = await new Promise<{ lat: number; lng: number } | null>((resolve) => {
+          const clientGeo = await new Promise<{ lat: number; lng: number; district?: string } | null>((resolve) => {
             geocoder.addressSearch(address, (res: any, status: any) => {
               if (status === win.kakao.maps.services.Status.OK && res[0]) {
-                resolve({ lat: parseFloat(res[0].y), lng: parseFloat(res[0].x) });
+                const result = res[0];
+                let district = result.address?.region_2depth_name || result.road_address?.region_2depth_name || '';
+                resolve({ 
+                  lat: parseFloat(result.y), 
+                  lng: parseFloat(result.x),
+                  district: district
+                });
               } else {
                 resolve(null);
               }
