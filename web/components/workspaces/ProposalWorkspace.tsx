@@ -252,7 +252,7 @@ export default function ProposalWorkspace() {
         // 지오코딩 정밀도 진단 (항상 출처와 좌표 노출)
         const geoSrc = serverGeo.diagnostics?.source || serverGeo.source || 'unknown';
         const isKeyBroken = serverGeo.diagnostics?.is_key_missing;
-        const diagInfo = [
+        let diagInfo = [
           `[Server Diagnostics]`,
           `Source: ${geoSrc}${isKeyBroken ? ' (API Key Missing!)' : ''}`,
           `Coords: ${serverGeo.lat}, ${serverGeo.lng}`,
