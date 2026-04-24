@@ -457,24 +457,33 @@ kakao.maps.load(function() {
     }, 200);
   }
 
-  // 반경 원 (반경 모드만)
+  // 하벨사인 거리 계산기 (필터링용)
+  function getDist(lat1, lng1, lat2, lng2) {
+    var R = 6371;
+    var dLat = (lat2 - lat1) * Math.PI / 180;
+    var dLng = (lng2 - lng1) * Math.PI / 180;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return R * 2 * Math.asin(Math.sqrt(a));
+  }
+
+  // 반경 원 및 중앙 마커
   if (hasCenter && radii.length > 0) {
     var colors = ['#3182f6','#00c471','#f59e0b','#f04452','#8b5cf6','#06b6d4'];
-    var sortedRadii = radii.slice().sort(function(a,b){return a-b;});
-    sortedRadii.forEach(function(r, i) {
+    var maxR = Math.max.apply(null, radii);
+    radii.slice().sort(function(a,b){return a-b;}).forEach(function(r, i) {
       new kakao.maps.Circle({
         center: center,
         radius: r * 1000,
         strokeWeight: 2,
         strokeColor: colors[i % colors.length],
-        strokeOpacity: 0.8,
-        strokeStyle: 'dash',
-        fillColor: colors[i % colors.length],
-        fillOpacity: 0.06,
+        fillOpacity: 0.06, fillColor: colors[i % colors.length],
+        strokeOpacity: 0.8, strokeStyle: 'dash',
       }).setMap(map);
     });
     new kakao.maps.Marker({ position: center, map: map });
-    var maxR = Math.max.apply(null, sortedRadii);
+    
     if (maxR > 0) {
       var latDelta = maxR / 111;
       var lngDelta = maxR / (111 * Math.cos(centerLat * Math.PI / 180));
@@ -485,12 +494,17 @@ kakao.maps.load(function() {
     bounds.extend(center);
   }
 
-  // 단지별 별표 마커 (좌표 복구 로직 포함)
+  // 단지별 별표 마커 (좌표 복구 로직 포함 + 반경 필터링)
   var complexes = ${safeMarkerData};
   var pendingCount = 0;
+  var maxR = Math.max.apply(null, radii || [0]);
 
   complexes.forEach(function(c) {
     if (c.lat && c.lng && c.lat > 0) {
+      if (hasCenter && maxR > 0) {
+        var d = getDist(centerLat, centerLng, c.lat, c.lng);
+        if (d > maxR) return;
+      }
       var pos = new kakao.maps.LatLng(c.lat, c.lng);
       bounds.extend(pos);
       new kakao.maps.Marker({ position: pos, map: map, image: markerImage, title: c.name });
@@ -500,16 +514,26 @@ kakao.maps.load(function() {
       pendingCount++;
       geocoder.addressSearch(query, function(res, status) {
         if (status === kakao.maps.services.Status.OK && res[0]) {
-          var pos = new kakao.maps.LatLng(res[0].y, res[0].x);
-          bounds.extend(pos);
-          new kakao.maps.Marker({ position: pos, map: map, image: markerImage, title: c.name });
+          var plat = parseFloat(res[0].y), plng = parseFloat(res[0].x);
+          if (hasCenter && maxR > 0) {
+            var pd = getDist(centerLat, centerLng, plat, plng);
+            if (pd > maxR) { pendingCount--; if (pendingCount === 0) updateBounds(); return; }
+          }
+          var ppos = new kakao.maps.LatLng(plat, plng);
+          bounds.extend(ppos);
+          new kakao.maps.Marker({ position: ppos, map: map, image: markerImage, title: c.name });
         } else {
           // 최후의 수단: 단순히 이름으로만 한 번 더 시도
           geocoder.addressSearch(c.name, function(res2, status2) {
             if (status2 === kakao.maps.services.Status.OK && res2[0]) {
-              var pos2 = new kakao.maps.LatLng(res2[0].y, res2[0].x);
-              bounds.extend(pos2);
-              new kakao.maps.Marker({ position: pos2, map: map, image: markerImage, title: c.name });
+              var plat2 = parseFloat(res2[0].y), plng2 = parseFloat(res2[0].x);
+              if (hasCenter && maxR > 0) {
+                var pd2 = getDist(centerLat, centerLng, plat2, plng2);
+                if (pd2 > maxR) return;
+              }
+              var ppos2 = new kakao.maps.LatLng(plat2, plng2);
+              bounds.extend(ppos2);
+              new kakao.maps.Marker({ position: ppos2, map: map, image: markerImage, title: c.name });
             }
           });
         }
