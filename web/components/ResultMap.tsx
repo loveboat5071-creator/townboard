@@ -316,7 +316,7 @@ export default function ResultMap({ center, complexes, radii, activeRadius }: Re
     }
 
     const script = document.createElement('script');
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${jsKey}&autoload=false`;
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${jsKey}&autoload=false&libraries=services`;
     script.onload = () => {
       const maps = window.kakao?.maps;
       if (!maps) {
