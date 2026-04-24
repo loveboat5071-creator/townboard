@@ -41,6 +41,25 @@ let _cache: Complex[] | null = null;
 
 const BLOB_MASTER_KEY = 'townboard/master.json';
 const BLOB_MASTER_META_KEY = 'townboard/master.meta.json';
+
+// 전국 주요 시/구 중심 좌표 폴백 (지오코딩 실패 시 대비)
+const DISTRICT_CENTER_FALLBACK: Record<string, { lat: number; lng: number }> = {
+  '남동': { lat: 37.4469, lng: 126.7315 },
+  '남동구': { lat: 37.4469, lng: 126.7315 },
+  '인천': { lat: 37.4563, lng: 126.7052 },
+  '서울': { lat: 37.5665, lng: 126.9780 },
+  '강남': { lat: 37.5172, lng: 127.0473 },
+  '해운대': { lat: 35.1631, lng: 129.1635 },
+  '수성': { lat: 35.8582, lng: 128.6306 },
+  '유성': { lat: 36.3622, lng: 127.3563 },
+  '수지': { lat: 37.3223, lng: 127.0975 },
+  '기흥': { lat: 37.2804, lng: 127.1147 },
+  '분당': { lat: 37.3827, lng: 127.1189 },
+  '부평': { lat: 37.5071, lng: 126.7219 },
+  '미추홀': { lat: 37.4636, lng: 126.6502 },
+  '연수': { lat: 37.4101, lng: 126.6783 },
+  '강서': { lat: 37.5509, lng: 126.8497 },
+};
 const BLOB_MASTER_ACCESS = process.env.MASTER_BLOB_ACCESS === 'public' ? 'public' : 'private';
 const INVALID_TEXT_VALUES = new Set(['', 'null', 'undefined', 'n/a', 'na', '-']);
 
@@ -581,12 +600,19 @@ export async function searchByDistrict(req: {
 
     // 좌표가 없는 경우 실시간 보정
     if (complex.lat == null || complex.lat === 0 || complex.lat === 37.5665) {
-      const addr = complex.addr_road || complex.addr_parcel || '';
+      const addr = complex.addr_road || complex.addr_parcel || complex.name;
       if (addr) {
         const geo = await fetchKakaoLocationInternal(addr);
         if (geo) {
           complex.lat = geo.lat;
           complex.lng = geo.lng;
+        } else {
+          // 주소로 안되면 아파트명+지역으로 재시도
+          const geo2 = await fetchKakaoLocationInternal(`${complex.city} ${complex.district} ${complex.name}`);
+          if (geo2) {
+            complex.lat = geo2.lat;
+            complex.lng = geo2.lng;
+          }
         }
       }
     }
@@ -627,9 +653,19 @@ export async function searchByDistrict(req: {
       avgLat = withGeo.reduce((s, c) => s + (c.lat || 0), 0) / withGeo.length;
       avgLng = withGeo.reduce((s, c) => s + (c.lng || 0), 0) / withGeo.length;
     } else {
-      // 모든 좌표가 0인 경우 폴백 (서울 기본)
-      avgLat = 37.5665;
-      avgLng = 126.9780;
+      // 모든 좌표가 0인 경우 폴백 (선택된 지역 중 첫 번째 알려진 좌표 사용)
+      for (const d of districts) {
+        const cleanD = normalizeFilterText(d);
+        if (DISTRICT_CENTER_FALLBACK[cleanD]) {
+          avgLat = DISTRICT_CENTER_FALLBACK[cleanD].lat;
+          avgLng = DISTRICT_CENTER_FALLBACK[cleanD].lng;
+          break;
+        }
+      }
+      if (!avgLat) {
+        avgLat = 37.5665; // 최후의 보루
+        avgLng = 126.9780;
+      }
     }
   }
 
