@@ -490,38 +490,16 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
   );
   const matched: MatchedComplex[] = [];
 
-  // [Simple District Priority] 클라이언트가 보내준 특정 구(District)를 최우선으로 매칭
-  const targetDistrict = districts[districts.length - 1] || '';
-
   for (const complex of data) {
     if (require_ev && !complex.ev_charger_installed) continue;
 
-    // [Direct Name Match] 아파트의 구 이름과 검색 대상 구를 1:1 또는 포함 관계로 대조 (원본 앱 방식)
-    const complexDistrict = complex.district || '';
-    const isTargetDistrict = targetDistrict && (
-      complexDistrict === targetDistrict ||
-      complexDistrict.includes(targetDistrict) ||
-      targetDistrict.includes(complexDistrict) ||
-      (targetDistrict.includes('미추홀') && complexDistrict.includes('남구')) || 
-      (targetDistrict.includes('남') && complexDistrict.includes('미추홀'))
-    );
-    
-    // 주소에서 구 이름을 찾았는데, 아파트가 다른 구에 속한다면 과감히 제외 (과부하 방지)
-    if (targetDistrict && !isTargetDistrict) continue;
-
-    // 만약 구 이름이 없는 광역 주소라면 최소한 도시명(인천 등)은 같아야 함
-    const complexCity = normalizeFilterText(complex.city || '');
-    const searchCity = address.split(/\s+/)[0] ? normalizeFilterText(address.split(/\s+/)[0]) : '';
-    if (!targetDistrict && !(complexCity && searchCity && (complexCity.includes(searchCity) || searchCity.includes(complexCity)))) {
-      continue;
-    }
-
-    // [Smart Coordinate Recovery] 좌표가 없거나 기본값인 경우, 해당 구에 속한다면 실시간으로 위치 복구 시도 (원본급 지능)
+    // [Original App Strategy] 지역 제한 없이 오직 '좌표'와 '거리'에만 집중함
     let finalLat = Number(complex.lat || 0);
     let finalLng = Number(complex.lng || 0);
     const isMissingGeo = !finalLat || finalLat === 37.5665 || !finalLng;
 
-    if (isMissingGeo && isTargetDistrict) {
+    // 좌표가 없는 경우에만 보조적으로 지역(구) 기반 실시간 복구 시도
+    if (isMissingGeo && districtSet.size > 0 && districtSet.has(normalizeFilterText(complex.district))) {
       const recovered = await fetchKakaoLocationInternal(complex.addr_road || complex.addr_parcel || `${complex.city} ${complex.district} ${complex.name}`);
       if (recovered) {
         finalLat = recovered.lat;
@@ -529,8 +507,8 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
       }
     }
 
-    // 좌표가 여전히 없다면 제외
-    if (!finalLat || finalLat === 0 || !finalLng) continue;
+    // 좌표가 여전히 없거나 폴백(서울중심)이면 제외
+    if (!finalLat || finalLat === 0 || finalLat === 37.5665) continue;
 
     const dist = haversineDistance(lat, lng, finalLat, finalLng);
     if (dist > maxRadius) continue;
