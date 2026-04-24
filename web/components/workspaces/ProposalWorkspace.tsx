@@ -193,14 +193,15 @@ export default function ProposalWorkspace() {
     setError('');
     setResult(null);
 
-    const tryClientSideGeocode = (data: SearchResponse) => {
-      if (data.results && typeof window !== 'undefined' && window.kakao?.maps?.services) {
-        const geocoder = new window.kakao.maps.services.Geocoder();
+    const tryClientSideGeocode = (data: SearchResult) => {
+      const win = window as any;
+      if (data.results && typeof win !== 'undefined' && win.kakao?.maps?.services) {
+        const geocoder = new win.kakao.maps.services.Geocoder();
         data.results.forEach((item: any) => {
           if (!item.lat || item.lat === 0 || item.lat === 37.5665) {
             const query = item.addr_road || item.addr_parcel || `${item.city} ${item.district} ${item.name}`;
             geocoder.addressSearch(query, (res: any, status: any) => {
-              if (status === window.kakao.maps.services.Status.OK && res[0]) {
+              if (status === win.kakao.maps.services.Status.OK && res[0]) {
                 item.lat = parseFloat(res[0].y);
                 item.lng = parseFloat(res[0].x);
                 setResult(prev => prev ? { ...prev, results: [...prev.results] } : prev);
@@ -221,12 +222,13 @@ export default function ProposalWorkspace() {
 
         if (geoResp.ok && serverGeo.lat) {
           geoData = serverGeo;
-        } else if (typeof window !== 'undefined' && window.kakao?.maps?.services) {
+        } else if (typeof (window as any) !== 'undefined' && (window as any).kakao?.maps?.services) {
           // [Client-side Fallback] 서버 지오코딩 실패 시 브라우저에서 직접 시도
-          const geocoder = new window.kakao.maps.services.Geocoder();
+          const win = window as any;
+          const geocoder = new win.kakao.maps.services.Geocoder();
           const clientGeo = await new Promise<{ lat: number; lng: number } | null>((resolve) => {
             geocoder.addressSearch(address, (res: any, status: any) => {
-              if (status === window.kakao.maps.services.Status.OK && res[0]) {
+              if (status === win.kakao.maps.services.Status.OK && res[0]) {
                 resolve({ lat: parseFloat(res[0].y), lng: parseFloat(res[0].x) });
               } else {
                 resolve(null);
