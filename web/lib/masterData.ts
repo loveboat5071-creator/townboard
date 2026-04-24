@@ -503,8 +503,8 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
       complexDistrict === targetDistrict ||
       complexDistrict.includes(targetDistrict) ||
       targetDistrict.includes(complexDistrict) ||
-      (targetDistrict === '미추홀구' && complexDistrict === '남구') ||
-      (targetDistrict === '남구' && complexDistrict === '미추홀구')
+      (targetDistrict === '미추홀' && complexDistrict === '남') ||
+      (targetDistrict === '남' && complexDistrict === '미추홀')
     );
     
     // 주소에서 구 이름을 찾았는데, 아파트가 다른 구에 속한다면 과감히 제외 (과부하 방지)
@@ -609,8 +609,8 @@ export async function searchByDistrict(req: {
     const isMatched = (
       complexCity.includes(target) || 
       complexDistrict.includes(target) ||
-      (target === '미추홀구' && complexDistrict === '남구') ||
-      (target === '남구' && complexDistrict === '미추홀구')
+      (target === '미추홀' && complexDistrict === '남') ||
+      (target === '남' && complexDistrict === '미추홀')
     );
     if (!isMatched) continue;
     if (require_ev && !complex.ev_charger_installed) continue;
