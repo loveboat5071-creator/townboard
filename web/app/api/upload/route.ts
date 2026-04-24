@@ -330,7 +330,7 @@ export async function POST(req: NextRequest) {
         if (cellValue != null && cellValue !== '') hasData = true;
 
         const numFields = [
-          'built_year', 'floors', 'area_pyeong', 'households', 'population', 'units', 'unit_price', 'price_4w',
+          'floors', 'households', 'population', 'units', 'unit_price', 'price_4w',
           'public_price_median', 'public_price_per_m2_median', 'rt_price_median', 'rt_price_per_m2_median',
           'ev_charger_count', 'lat', 'lng',
         ];
@@ -338,6 +338,9 @@ export async function POST(req: NextRequest) {
           const cleaned = String(cellValue || '').replace(/[, ]/g, '');
           const num = Number(cleaned);
           record[field] = isNaN(num) ? null : num;
+        } else if (field === 'area_pyeong' || field === 'built_year') {
+          // 평형과 입주년도는 원본 문자열 그대로 보존 (쉼표 유지)
+          record[field] = cellValue != null ? String(cellValue).trim() : null;
         } else if (field === 'ev_charger_installed') {
           const text = String(cellValue || '').trim().toLowerCase();
           record[field] = text === '1' || text === 'true' || text === 'y' || text === 'yes' || text.startsWith('설치');
