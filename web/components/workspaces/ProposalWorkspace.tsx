@@ -278,12 +278,11 @@ export default function ProposalWorkspace() {
         }
 
         // [District Extraction Fallback] 지도 엔진이 구 이름을 못 찾으면 텍스트에서 직접 추출
-        const textDistrictMatch = address.match(/(\S+(?:시|군|구))/);
-        const finalDistrict = geoData.district || (textDistrictMatch ? textDistrictMatch[1] : '');
-
-        // [Broad Search Strategy] 구 보다는 '시' 단위로 넓게 데이터를 가져와서 반경 내 누락 방기
-        const cityMatch = address.split(/\s+/)[0];
-        const searchDistricts = [cityMatch, finalDistrict].filter(Boolean);
+        const districtMatches = address.match(/(\S+(?:시|군|구))/g) || [];
+        const searchDistricts = [...districtMatches];
+        if (geoData.district && !searchDistricts.includes(geoData.district)) {
+          searchDistricts.push(geoData.district);
+        }
 
         const searchResp = await fetch('/api/search-district', {
           method: 'POST',
