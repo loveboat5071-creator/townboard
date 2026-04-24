@@ -242,14 +242,11 @@ export default function ProposalWorkspace() {
           return;
         }
 
-        const searchResp = await fetch('/api/search', {
+        const searchResp = await fetch('/api/search-district', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            lat: geoData.lat,
-            lng: geoData.lng,
-            address: address.trim(),
-            radii: selectedRadii,
+            districts: [geoData.district || ''],
             require_ev: requireEvOnly,
             sort_by: sortBy,
             advertiser_industry: advertiserIndustry || undefined,
@@ -259,7 +256,57 @@ export default function ProposalWorkspace() {
         });
         const searchData = await searchResp.json();
         if (!searchResp.ok) { setError(searchData.error || '검색 실패'); return; }
-        tryClientSideGeocode(searchData);
+
+        // [Client-side Radius Filter] 가져온 지역 전체 아파트 중 반경 내에 있는 것만 필터링
+        if (searchData.results) {
+          const centerLat = geoData.lat;
+          const centerLng = geoData.lng;
+          const maxRadiusKm = Math.max(...selectedRadii);
+
+          // 하버사인 공식으로 거리 계산 함수 정의
+          const getDist = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          };
+
+          // 각 단지의 좌표 복구 후 거리 필터링
+          const win = window as any;
+          if (win.kakao?.maps?.services) {
+            const geocoder = new win.kakao.maps.services.Geocoder();
+            const promises = searchData.results.map((item: any) => {
+              return new Promise<void>((resolve) => {
+                if (!item.lat || item.lat === 0 || item.lat === 37.5665) {
+                  const q = item.addr_road || item.addr_parcel || `${item.city} ${item.district} ${item.name}`;
+                  geocoder.addressSearch(q, (res: any, status: any) => {
+                    if (status === win.kakao.maps.services.Status.OK && res[0]) {
+                      item.lat = parseFloat(res[0].y);
+                      item.lng = parseFloat(res[0].x);
+                    }
+                    const d = getDist(centerLat, centerLng, item.lat, item.lng);
+                    item.distance_km = d;
+                    resolve();
+                  });
+                } else {
+                  const d = getDist(centerLat, centerLng, item.lat, item.lng);
+                  item.distance_km = d;
+                  resolve();
+                }
+              });
+            });
+
+            await Promise.all(promises);
+            // 선택된 최대 반경 내의 단지만 골라냄
+            searchData.results = searchData.results.filter((item: any) => item.distance_km <= maxRadiusKm);
+            searchData.results.sort((a: any, b: any) => a.distance_km - b.distance_km);
+            searchData.center = { lat: centerLat, lng: centerLng, address: address.trim() };
+            searchData.radii = selectedRadii;
+          }
+        }
         setResult(searchData);
       } else {
         let effectiveDistricts = selectedDistricts;
