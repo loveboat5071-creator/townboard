@@ -619,9 +619,14 @@ export async function searchByDistrict(req: {
   const matched: MatchedComplex[] = [];
 
   for (const complex of data) {
+    const complexCity = normalizeFilterText(complex.city || '');
     const complexDistrict = normalizeFilterText(complex.district || '');
+    
     const isMatched = Array.from(districtSet).some(d => 
-      complexDistrict.includes(d)
+      complexCity.includes(d) || 
+      complexDistrict.includes(d) ||
+      (d === '미추홀구' && complexDistrict === '남구') ||
+      (d === '남구' && complexDistrict === '미추홀구')
     );
     if (!isMatched) continue;
     if (require_ev && !complex.ev_charger_installed) continue;
