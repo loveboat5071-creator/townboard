@@ -539,8 +539,8 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
     ) continue;
 
     // 좌표가 있는 경우에만 거리 계산. 없으면 0으로 일단 처리
-    const hasLat = complex.lat && complex.lat !== 0 && complex.lat !== 37.5665;
-    const dist = hasLat ? haversineDistance(lat, lng, complex.lat, complex.lng) : 0;
+    const hasLat = !!(complex.lat && complex.lat !== 0 && complex.lat !== 37.5665 && complex.lng);
+    const dist = hasLat ? haversineDistance(lat, lng, complex.lat as number, complex.lng as number) : 0;
     
     // 좌표가 있는 경우에만 반경 필터링 수행. 좌표 없으면 일단 통과(클라이언트가 나중에 거름)
     if (hasLat && dist > maxRadius) continue;
