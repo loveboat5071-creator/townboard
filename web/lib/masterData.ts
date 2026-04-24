@@ -16,26 +16,7 @@ import { classifyByRadius, haversineDistance } from './haversine';
 import { checkRestriction } from './restriction';
 import { aggregateByRegion } from './aggregator';
 
-async function fetchKakaoLocationInternal(address: string) {
-  const apiKey = (process.env.KAKAO_API_KEY || '').trim();
-  if (!apiKey) {
-    console.error('[InternalGeo] KAKAO_API_KEY is missing! Cannot geocode: ' + address);
-    return null;
-  }
-  try {
-    const res = await fetch(`https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(address)}`, {
-      headers: { Authorization: `KakaoAK ${apiKey}` }
-    });
-    const data = await res.json();
-    if (data?.documents?.[0]) {
-      const doc = data.documents[0];
-      return { lat: parseFloat(doc.y), lng: parseFloat(doc.x) };
-    }
-  } catch (e) {
-    console.warn('Real-time geocoding failed:', e);
-  }
-  return null;
-}
+
 
 let _cache: Complex[] | null = null;
 
