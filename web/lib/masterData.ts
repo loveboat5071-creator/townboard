@@ -631,25 +631,6 @@ export async function searchByDistrict(req: {
     if (!isMatched) continue;
     if (require_ev && !complex.ev_charger_installed) continue;
 
-    // 좌표가 없는 경우 실시간 보정
-    if (complex.lat == null || complex.lat === 0 || complex.lat === 37.5665) {
-      const addr = complex.addr_road || complex.addr_parcel || complex.name;
-      if (addr) {
-        const geo = await fetchKakaoLocationInternal(addr);
-        if (geo) {
-          complex.lat = geo.lat;
-          complex.lng = geo.lng;
-        } else {
-          // 주소로 안되면 아파트명+지역으로 재시도
-          const geo2 = await fetchKakaoLocationInternal(`${complex.city} ${complex.district} ${complex.name}`);
-          if (geo2) {
-            complex.lat = geo2.lat;
-            complex.lng = geo2.lng;
-          }
-        }
-      }
-    }
-
     const restrictionStatus = checkRestriction(complex, advertiser_industry, campaignDateObj);
 
     // 단지총단가 실시간 복구 (누락된 경우 계산)
