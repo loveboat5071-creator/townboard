@@ -277,15 +277,12 @@ export default function ProposalWorkspace() {
           return;
         }
 
-        // [Corrected Radius Search] Use the specialized search API for radius mode
-        const searchResp = await fetch('/api/search', {
+        // [Hybrid Radius Search] Fetch district data and geocode on client for maximum reliability
+        const searchResp = await fetch('/api/search-district', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            lat: geoData.lat,
-            lng: geoData.lng,
-            address: address.trim(),
-            radii: selectedRadii,
+            districts: [geoData.district || ''],
             require_ev: requireEvOnly,
             sort_by: sortBy,
             advertiser_industry: advertiserIndustry || undefined,
@@ -295,17 +292,59 @@ export default function ProposalWorkspace() {
         });
         
         const searchData = await searchResp.json();
-        if (!searchResp.ok) { setError(searchData.error || '검색 실패'); return; }
+        if (!searchResp.ok) { setError(searchData.error || '데이터 로드 실패'); return; }
 
-        // 결과 후처리 (평형 복구 및 마커 업데이트)
         if (searchData.results) {
+          const centerLat = geoData.lat;
+          const centerLng = geoData.lng;
+          const maxRadiusKm = Math.max(...selectedRadii);
+
+          const win = window as any;
+          const geocoder = win.kakao?.maps?.services ? new win.kakao.maps.services.Geocoder() : null;
+          
+          const getDist = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          };
+
+          const promises = searchData.results.map((item: any) => {
+            return new Promise<void>((resolve) => {
+              const lat = parseFloat(String(item.lat || '0'));
+              if (geocoder && (!lat || lat <= 0 || lat === 37.5665)) {
+                const q = (item.addr_road || item.addr_parcel || `${item.city || ''} ${item.district || ''} ${item.name}`).trim();
+                geocoder.addressSearch(q, (res: any, status: any) => {
+                  if (status === win.kakao.maps.services.Status.OK && res[0]) {
+                    item.lat = parseFloat(res[0].y);
+                    item.lng = parseFloat(res[0].x);
+                  }
+                  item.distance_km = getDist(centerLat, centerLng, item.lat, item.lng);
+                  resolve();
+                });
+              } else {
+                item.distance_km = getDist(centerLat, centerLng, item.lat, item.lng);
+                resolve();
+              }
+            });
+          });
+
+          await Promise.all(promises);
+          
+          // 반경 필터링 및 후처리
+          searchData.results = searchData.results.filter((item: any) => item.distance_km <= maxRadiusKm);
           searchData.results.forEach((item: any) => {
             item.area_pyeong = formatPyeong(item.area_pyeong);
           });
+          searchData.results.sort((a: any, b: any) => a.distance_km - b.distance_km);
+          searchData.center = { lat: centerLat, lng: centerLng, address: address.trim() };
+          searchData.radii = selectedRadii;
         }
         
         setResult(searchData);
-        tryClientSideGeocode(searchData); // 좌표 누락 단지 복구 시도
       } else {
         let effectiveDistricts = selectedDistricts;
 
