@@ -248,6 +248,14 @@ export default function ProposalWorkspace() {
         let geoData: { lat: number; lng: number; district?: string; error?: string };
         const geoResp = await fetch(`/api/geocode?address=${encodeURIComponent(address)}`);
         const serverGeo = await geoResp.json();
+        
+        // 지오코딩 정밀도 진단
+        let diagInfo = '';
+        if (serverGeo.diagnostics?.is_key_missing) {
+          diagInfo = '카카오 API 키 설정 확인 필요 (서버에서 키를 찾지 못함)';
+        } else if (serverGeo.diagnostics?.source === 'offline_fallback') {
+          diagInfo = '정밀 주소 검색 실패: 오프라인 구 단위 fallback 좌표 사용 중';
+        }
 
         if (geoResp.ok && serverGeo.lat) {
           geoData = serverGeo;
@@ -272,10 +280,14 @@ export default function ProposalWorkspace() {
           });
           if (!clientGeo) { setError(serverGeo.error || '주소를 찾을 수 없습니다.'); return; }
           geoData = clientGeo;
+          if (!diagInfo) diagInfo = '서버 지오코딩 실패로 브라우저(클라이언트) 검색 결과 사용 중';
         } else {
           setError(serverGeo.error || '주소 변환 실패');
           return;
         }
+
+        // 진단 정보를 SearchResult에 저장하여 UI로 전달 (기존 Result 타입 활용)
+        const currentDiagInfo = diagInfo;
 
         // [Simplified District Extraction] 주소에서 '구/군' 단위만 추출하여 정밀 타격
         const districtMatches = address.match(/(\S+(?:구|군))/g) || [];
@@ -311,7 +323,14 @@ export default function ProposalWorkspace() {
         });
         
         const searchData = await searchResp.json();
-        setResult(searchData); // 에러 발생 시에도 진단 데이터(debug_total_scanned)를 화면에 남기기 위해 호출
+        
+        // 검색 결과에 지오코딩 진단 정보 강제 주입
+        const augmentedData = {
+          ...searchData,
+          debug_info: currentDiagInfo || searchData.debug_info
+        };
+        
+        setResult(augmentedData); 
         
         if (!searchResp.ok) {
           setError(searchData.error || '검색 중 오류가 발생했습니다.');
@@ -319,14 +338,13 @@ export default function ProposalWorkspace() {
         }
 
         if (!searchData.results || searchData.results.length === 0) {
-          setResult(searchData); // 진단 데이터(debug_total_scanned)를 위해 상태 업데이트
           setError('해당 지역에 검색된 아파트가 없습니다. 주소를 다시 확인해주세요.');
           return;
         }
 
-        // 결과 반영
+        // 결과 반영 (Center 정보 포함)
         setResult({
-          ...searchData,
+          ...augmentedData,
           center: { lat: centerLat, lng: centerLng, address: address.trim() },
           radii: selectedRadii
         });
