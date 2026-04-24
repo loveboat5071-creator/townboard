@@ -288,39 +288,9 @@ export default function ProposalWorkspace() {
         const cleanedDistricts = searchDistricts.filter(d => !d.endsWith('시'));
         const finalRequestDistricts = cleanedDistricts.length > 0 ? cleanedDistricts : searchDistricts;
 
-        const searchResp = await fetch('/api/search-district', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            districts: finalRequestDistricts,
-            require_ev: requireEvOnly,
-            sort_by: sortBy,
-            advertiser_industry: advertiserIndustry || undefined,
-            advertiser_name: advertiserName || undefined,
-            campaign_name: campaignName || undefined,
-          }),
-        });
-        
-        const searchData = await searchResp.json();
-        if (!searchResp.ok) { setError(searchData.error || '데이터 로드 실패'); return; }
-
-        if (!searchData.results || searchData.results.length === 0) {
-          setError('해당 지역에 검색된 아파트가 없습니다. 주소를 다시 확인해주세요.');
-          return;
-        }
-
         const centerLat = geoData.lat;
         const centerLng = geoData.lng;
-        const maxRadiusKm = Math.max(...selectedRadii);
 
-        // [Progressive Rendering] 일단 가져온 데이터를 즉시 화면에 노출
-        searchData.center = { lat: centerLat, lng: centerLng, address: address.trim() };
-        searchData.radii = selectedRadii;
-        searchData.results.forEach((item: any) => {
-          item.distance_km = 0; // 초기값
-          item.area_pyeong = formatPyeong(item.area_pyeong);
-        });
-        
         // [Original App Strategy] 서버의 /api/search를 직접 호출하여 단 한 번에 완벽한 결과를 가져옴
         const searchResp = await fetch('/api/search', {
           method: 'POST',
@@ -330,7 +300,7 @@ export default function ProposalWorkspace() {
             lng: centerLng,
             address: address.trim(),
             radii: selectedRadii,
-            districts: searchDistricts,
+            districts: finalRequestDistricts,
             require_ev: requireEvOnly,
             sort_by: sortBy,
             advertiser_industry: advertiserIndustry || undefined,
@@ -344,6 +314,11 @@ export default function ProposalWorkspace() {
         
         if (!searchResp.ok) {
           setError(searchData.error || '검색 중 오류가 발생했습니다.');
+          return;
+        }
+
+        if (!searchData.results || searchData.results.length === 0) {
+          setError('해당 지역에 검색된 아파트가 없습니다. 주소를 다시 확인해주세요.');
           return;
         }
 
