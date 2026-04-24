@@ -277,12 +277,16 @@ export default function ProposalWorkspace() {
           return;
         }
 
+        // [District Extraction Fallback] 지도 엔진이 구 이름을 못 찾으면 텍스트에서 직접 추출
+        const textDistrictMatch = address.match(/(\S+(?:시|군|구))/);
+        const finalDistrict = geoData.district || (textDistrictMatch ? textDistrictMatch[1] : '');
+
         // [Hybrid Radius Search] Fetch district data and geocode on client for maximum reliability
         const searchResp = await fetch('/api/search-district', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            districts: [geoData.district || ''],
+            districts: [finalDistrict].filter(Boolean),
             require_ev: requireEvOnly,
             sort_by: sortBy,
             advertiser_industry: advertiserIndustry || undefined,
