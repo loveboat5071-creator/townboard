@@ -420,7 +420,7 @@ ${includeCreative ? `
   <p style="font-size:11px;color:#999;margin-top:8px;text-align:center;">※ 인쇄 전 지도가 완전히 로드된 것을 확인한 후 인쇄해주세요.</p>
 </div>
 
-<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoJsKey}&autoload=false"></script>
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoJsKey}&autoload=false&libraries=services"></script>
 <script>
 kakao.maps.load(function() {
   var centerLat = ${data.center.lat};
@@ -435,6 +435,20 @@ kakao.maps.load(function() {
   });
 
   var bounds = new kakao.maps.LatLngBounds();
+  var geocoder = new kakao.maps.services.Geocoder();
+  var markerImage = new kakao.maps.MarkerImage(
+    'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
+    new kakao.maps.Size(24, 35)
+  );
+
+  function updateBounds() {
+    map.relayout();
+    setTimeout(function() {
+      if (!bounds.isEmpty()) {
+        map.setBounds(bounds, 50, 50, 50, 50);
+      }
+    }, 200);
+  }
 
   // 반경 원 (반경 모드만)
   if (hasCenter && radii.length > 0) {
@@ -452,10 +466,7 @@ kakao.maps.load(function() {
         fillOpacity: 0.06,
       }).setMap(map);
     });
-    // 중심 마커
     new kakao.maps.Marker({ position: center, map: map });
-    
-    // 반경 기준 bounds 확장
     var maxR = Math.max.apply(null, sortedRadii);
     if (maxR > 0) {
       var latDelta = maxR / 111;
@@ -464,85 +475,43 @@ kakao.maps.load(function() {
       bounds.extend(new kakao.maps.LatLng(centerLat + latDelta, centerLng + lngDelta));
     }
   } else if (hasCenter) {
-    // 지역별 모드 등 반경이 없을 때
     bounds.extend(center);
   }
 
-  // 단지 마커
+  // 단지별 별표 마커 (좌표 복구 로직 포함)
   var complexes = ${safeMarkerData};
-  var markerImage = new kakao.maps.MarkerImage(
-    'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
-    new kakao.maps.Size(24, 35)
-  );
+  var pendingCount = 0;
+
   complexes.forEach(function(c) {
-    if (!c.lat || !c.lng) return;
-    var pos = new kakao.maps.LatLng(c.lat, c.lng);
-    bounds.extend(pos);
-    new kakao.maps.Marker({
-      position: pos,
-      map: map,
-      image: markerImage,
-      title: c.name,
-    });
+    if (c.lat && c.lng && c.lat > 0) {
+      var pos = new kakao.maps.LatLng(c.lat, c.lng);
+      bounds.extend(pos);
+      new kakao.maps.Marker({ position: pos, map: map, image: markerImage, title: c.name });
+    } else {
+      var query = (c.addr_road || c.addr_parcel || c.name).trim();
+      if (!query) return;
+      pendingCount++;
+      geocoder.addressSearch(query, function(res, status) {
+        if (status === kakao.maps.services.Status.OK && res[0]) {
+          var pos = new kakao.maps.LatLng(res[0].y, res[0].x);
+          bounds.extend(pos);
+          new kakao.maps.Marker({ position: pos, map: map, image: markerImage, title: c.name });
+        }
+        pendingCount--;
+        if (pendingCount === 0) updateBounds();
+      });
+    }
   });
 
-  // bounds 기반 표시 — 중심+마커 모두 포함
-  // bounds의 중심점 계산
-  var sw = bounds.getSouthWest();
-  var ne = bounds.getNorthEast();
-  var boundsCenter = new kakao.maps.LatLng(
-    (sw.getLat() + ne.getLat()) / 2,
-    (sw.getLng() + ne.getLng()) / 2
-  );
-
-  function fitMap() {
-    map.relayout();
-    // relayout 후 프레임 대기 필요
-    setTimeout(function() {
-      map.setBounds(bounds, 50, 50, 50, 50);
-    }, 200);
-  }
-
-  function centerMap() {
-    // setBounds가 동작하지 않을 경우 대비: 직접 중심+줌 설정
-    map.relayout();
-    setTimeout(function() {
-      map.setBounds(bounds, 50, 50, 50, 50);
-      // 추가로 중심 보정
-      setTimeout(function() {
-        map.setCenter(boundsCenter);
-      }, 100);
-    }, 200);
-  }
-
-  // 초기 로딩
-  fitMap();
-  setTimeout(centerMap, 800);
-  setTimeout(centerMap, 2000);
-
-  window.addEventListener('resize', function() { setTimeout(fitMap, 200); });
-  window.addEventListener('beforeprint', function() {
-    // 인쇄 시 레이아웃 변경 → relayout → 대기 → setBounds
-    map.relayout();
-    setTimeout(function() {
-      map.setBounds(bounds, 50, 50, 50, 50);
-      setTimeout(function() { map.setCenter(boundsCenter); }, 100);
-    }, 200);
-  });
-  window.addEventListener('afterprint', function() { setTimeout(centerMap, 300); });
-
+  if (pendingCount === 0) updateBounds();
+  
+  // 기타 제어 로직 (인쇄 버튼 등)
   var printBtn = document.querySelector('.print-btn');
   if (printBtn) {
     printBtn.onclick = function(e) {
       e.preventDefault();
-      map.relayout();
-      setTimeout(function() {
-        map.setBounds(bounds, 50, 50, 50, 50);
-        setTimeout(function() {
-          map.setCenter(boundsCenter);
-          setTimeout(function() { window.print(); }, 500);
-        }, 300);
-      }, 300);
+      updateBounds();
+      setTimeout(function() { window.print(); }, 800);
     };
   }
 });
