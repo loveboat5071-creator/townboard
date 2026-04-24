@@ -582,6 +582,8 @@ export default function ProposalWorkspace() {
 
             {activeTab === 'summary' && (
               <div className="table-container">
+                  </div>
+                )}
                 <table className="data-table">
                   <thead>
                     <tr>

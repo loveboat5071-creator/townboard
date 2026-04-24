@@ -498,8 +498,11 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
     let finalLng = Number(complex.lng || 0);
     const isMissingGeo = !finalLat || finalLat === 37.5665 || !finalLng;
 
-    // 좌표가 없는 경우에만 보조적으로 지역(구) 기반 실시간 복구 시도
-    if (isMissingGeo && districtSet.size > 0 && districtSet.has(normalizeFilterText(complex.district))) {
+    // 좌표가 없는 경우, 주소 텍스트에 검색어 키워드(예: 남동구)가 포함된 경우에만 보조적으로 위치 복구 시도 (과부하 방지)
+    if (isMissingGeo && (
+      (address && complex.addr_road && complex.addr_road.includes(address.split(' ')[1] || '')) ||
+      (districtSet.size > 0 && districtSet.has(normalizeFilterText(complex.district)))
+    )) {
       const recovered = await fetchKakaoLocationInternal(complex.addr_road || complex.addr_parcel || `${complex.city} ${complex.district} ${complex.name}`);
       if (recovered) {
         finalLat = recovered.lat;
@@ -553,6 +556,7 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
     total_households: available.reduce((s, c) => s + (c.households || 0), 0),
     total_units: available.reduce((s, c) => s + (c.units || 0), 0),
     total_price_4w: available.reduce((s, c) => s + (c.price_4w || 0), 0),
+    debug_total_scanned: data.length,
   };
 }
 
