@@ -482,7 +482,7 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
     const isInvalidGeo = !finalLat || finalLat === 37.5665 || !finalLng;
 
     if (isInvalidGeo && complex.addr_road && recoveredCount < 30) {
-      const complexText = \`\${complex.city} \${complex.district}\`;
+      const complexText = `${complex.city} ${complex.district}`;
       const isRelevant = searchKeywords.some(k => complexText.includes(k));
       
       if (isRelevant) {
