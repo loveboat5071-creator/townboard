@@ -320,27 +320,33 @@ export default function ProposalWorkspace() {
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
           };
 
-          const promises = searchData.results.map((item: any) => {
-            return new Promise<void>((resolve) => {
-              const lat = parseFloat(String(item.lat || '0'));
-              if (geocoder && (!lat || lat <= 0 || lat === 37.5665)) {
-                const q = (item.addr_road || item.addr_parcel || `${item.city || ''} ${item.district || ''} ${item.name}`).trim();
-                geocoder.addressSearch(q, (res: any, status: any) => {
-                  if (status === win.kakao.maps.services.Status.OK && res[0]) {
-                    item.lat = parseFloat(res[0].y);
-                    item.lng = parseFloat(res[0].x);
-                  }
+          // [Optimized Batch Geocoding] 너무 많은 동시 요청은 카카오 API에서 차단될 수 있으므로 분할 처리
+          const batchSize = 15; // 15개씩 묶어서 처리
+          for (let i = 0; i < searchData.results.length; i += batchSize) {
+            const batch = searchData.results.slice(i, i + batchSize);
+            const promises = batch.map((item: any) => {
+              return new Promise<void>((resolve) => {
+                const lat = parseFloat(String(item.lat || '0'));
+                if (geocoder && (!lat || lat <= 0 || lat === 37.5665)) {
+                  const q = (item.addr_road || item.addr_parcel || `${item.city || ''} ${item.district || ''} ${item.name}`).trim();
+                  geocoder.addressSearch(q, (res: any, status: any) => {
+                    if (status === win.kakao.maps.services.Status.OK && res[0]) {
+                      item.lat = parseFloat(res[0].y);
+                      item.lng = parseFloat(res[0].x);
+                    }
+                    item.distance_km = getDist(centerLat, centerLng, item.lat, item.lng);
+                    resolve();
+                  });
+                } else {
                   item.distance_km = getDist(centerLat, centerLng, item.lat, item.lng);
                   resolve();
-                });
-              } else {
-                item.distance_km = getDist(centerLat, centerLng, item.lat, item.lng);
-                resolve();
-              }
+                }
+              });
             });
-          });
-
-          await Promise.all(promises);
+            await Promise.all(promises);
+            // API 부하를 줄이기 위한 미세한 지연
+            if (i + batchSize < searchData.results.length) await new Promise(r => setTimeout(r, 50));
+          }
           
           // 반경 필터링 및 후처리
           searchData.results = searchData.results.filter((item: any) => item.distance_km <= maxRadiusKm);
