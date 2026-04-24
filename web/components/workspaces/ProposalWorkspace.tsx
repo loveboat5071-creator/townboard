@@ -350,12 +350,44 @@ export default function ProposalWorkspace() {
           
           // 반경 필터링 및 후처리
           searchData.results = searchData.results.filter((item: any) => item.distance_km <= maxRadiusKm);
+          
+          // [Summary Recalculation] 필터링된 결과로 요약 정보 재계산
+          const summaryMap: Record<string, any> = {};
+          searchData.results.forEach((item: any) => {
+            const key = `${item.city || ''}_${item.district || ''}`;
+            if (!summaryMap[key]) {
+              summaryMap[key] = {
+                city: item.city || '',
+                district: item.district || '',
+                count: 0,
+                total_households: 0,
+                total_units: 0,
+                total_price_4w: 0,
+                total_unit_price: 0
+              };
+            }
+            summaryMap[key].count++;
+            summaryMap[key].total_households += Number(item.households || 0);
+            summaryMap[key].total_units += Number(item.units || 0);
+            summaryMap[key].total_price_4w += Number(item.price_4w || 0);
+            summaryMap[key].total_unit_price += Number(item.unit_price || 0);
+          });
+
+          searchData.summaries = Object.values(summaryMap).map((s: any) => ({
+            ...s,
+            avg_unit_price: s.count > 0 ? Math.round(s.total_unit_price / s.count) : 0
+          }));
+
           searchData.results.forEach((item: any) => {
             item.area_pyeong = formatPyeong(item.area_pyeong);
           });
           searchData.results.sort((a: any, b: any) => a.distance_km - b.distance_km);
           searchData.center = { lat: centerLat, lng: centerLng, address: address.trim() };
           searchData.radii = selectedRadii;
+          searchData.total_count = searchData.results.length;
+          searchData.total_households = searchData.results.reduce((acc: number, cur: any) => acc + (cur.households || 0), 0);
+          searchData.total_units = searchData.results.reduce((acc: number, cur: any) => acc + (cur.units || 0), 0);
+          searchData.total_price_4w = searchData.results.reduce((acc: number, cur: any) => acc + (cur.price_4w || 0), 0);
         }
         
         setResult(searchData);
