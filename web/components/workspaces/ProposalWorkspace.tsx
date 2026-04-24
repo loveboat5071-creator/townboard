@@ -281,11 +281,10 @@ export default function ProposalWorkspace() {
         const textDistrictMatch = address.match(/(\S+(?:시|군|구))/);
         const finalDistrict = geoData.district || (textDistrictMatch ? textDistrictMatch[1] : '');
 
-        // [Broad Search Strategy] 구 보다는 '시' 단위로 넓게 데이터를 가져와서 반경 내 누락 방지
+        // [Broad Search Strategy] 구 보다는 '시' 단위로 넓게 데이터를 가져와서 반경 내 누락 방기
         const cityMatch = address.split(/\s+/)[0];
         const searchDistricts = [cityMatch, finalDistrict].filter(Boolean);
 
-        // [Hybrid Radius Search] Fetch wide data and geocode on client for maximum reliability
         const searchResp = await fetch('/api/search-district', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -302,95 +301,98 @@ export default function ProposalWorkspace() {
         const searchData = await searchResp.json();
         if (!searchResp.ok) { setError(searchData.error || '데이터 로드 실패'); return; }
 
-        if (searchData.results) {
-          const centerLat = geoData.lat;
-          const centerLng = geoData.lng;
-          const maxRadiusKm = Math.max(...selectedRadii);
+        if (!searchData.results || searchData.results.length === 0) {
+          setError('해당 지역에 검색된 아파트가 없습니다. 주소를 다시 확인해주세요.');
+          return;
+        }
 
-          const win = window as any;
-          const geocoder = win.kakao?.maps?.services ? new win.kakao.maps.services.Geocoder() : null;
-          
-          const getDist = (lat1: number, lng1: number, lat2: number, lng2: number) => {
-            const R = 6371;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLng = (lng2 - lng1) * Math.PI / 180;
-            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLng / 2) * Math.sin(dLng / 2);
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-          };
+        const centerLat = geoData.lat;
+        const centerLng = geoData.lng;
+        const maxRadiusKm = Math.max(...selectedRadii);
 
-          // [Optimized Batch Geocoding] 너무 많은 동시 요청은 카카오 API에서 차단될 수 있으므로 분할 처리
-          const batchSize = 15; // 15개씩 묶어서 처리
-          for (let i = 0; i < searchData.results.length; i += batchSize) {
-            const batch = searchData.results.slice(i, i + batchSize);
-            const promises = batch.map((item: any) => {
-              return new Promise<void>((resolve) => {
-                const lat = parseFloat(String(item.lat || '0'));
-                if (geocoder && (!lat || lat <= 0 || lat === 37.5665)) {
-                  const q = (item.addr_road || item.addr_parcel || `${item.city || ''} ${item.district || ''} ${item.name}`).trim();
-                  geocoder.addressSearch(q, (res: any, status: any) => {
-                    if (status === win.kakao.maps.services.Status.OK && res[0]) {
-                      item.lat = parseFloat(res[0].y);
-                      item.lng = parseFloat(res[0].x);
-                    }
-                    item.distance_km = getDist(centerLat, centerLng, item.lat, item.lng);
-                    resolve();
-                  });
-                } else {
+        // [Progressive Rendering] 일단 가져온 데이터를 즉시 화면에 노출 (0건 방지)
+        searchData.center = { lat: centerLat, lng: centerLng, address: address.trim() };
+        searchData.radii = selectedRadii;
+        searchData.results.forEach((item: any) => {
+          item.distance_km = 0; // 초기값
+          item.area_pyeong = formatPyeong(item.area_pyeong);
+        });
+        setResult({ ...searchData });
+
+        // [Background Geocoding & Refinement]
+        const win = window as any;
+        const geocoder = win.kakao?.maps?.services ? new win.kakao.maps.services.Geocoder() : null;
+        const getDist = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+          const R = 6371;
+          const dLat = (lat2 - lat1) * Math.PI / 180;
+          const dLng = (lng2 - lng1) * Math.PI / 180;
+          const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+          return R * 2 * Math.asin(Math.sqrt(a));
+        };
+
+        const batchSize = 10;
+        let finalResults = [...searchData.results];
+
+        for (let i = 0; i < finalResults.length; i += batchSize) {
+          const batch = finalResults.slice(i, i + batchSize);
+          await Promise.all(batch.map((item: any) => {
+            return new Promise<void>((resolve) => {
+              const currentLat = parseFloat(String(item.lat || '0'));
+              if (geocoder && (!currentLat || currentLat <= 0 || currentLat === 37.5665)) {
+                const q = (item.addr_road || item.addr_parcel || `${item.city || ''} ${item.district || ''} ${item.name}`).trim();
+                geocoder.addressSearch(q, (res: any, status: any) => {
+                  if (status === win.kakao.maps.services.Status.OK && res[0]) {
+                    item.lat = parseFloat(res[0].y);
+                    item.lng = parseFloat(res[0].x);
+                  }
                   item.distance_km = getDist(centerLat, centerLng, item.lat, item.lng);
                   resolve();
-                }
-              });
+                });
+              } else {
+                item.distance_km = getDist(centerLat, centerLng, item.lat, item.lng);
+                resolve();
+              }
             });
-            await Promise.all(promises);
-            // API 부하를 줄이기 위한 미세한 지연
-            if (i + batchSize < searchData.results.length) await new Promise(r => setTimeout(r, 50));
-          }
+          }));
           
-          // 반경 필터링 및 후처리
-          searchData.results = searchData.results.filter((item: any) => item.distance_km <= maxRadiusKm);
+          // 중간 중간 결과를 업데이트하여 마커가 하나둘씩 나타나게 함
+          const currentFiltered = finalResults.filter(item => !item.distance_km || item.distance_km <= maxRadiusKm);
+          setResult(prev => prev ? { 
+            ...prev, 
+            results: [...currentFiltered].sort((a, b) => (a.distance_km || 0) - (b.distance_km || 0)) 
+          } : null);
           
-          // [Summary Recalculation] 필터링된 결과로 요약 정보 재계산
+          if (i + batchSize < finalResults.length) await new Promise(r => setTimeout(r, 100));
+        }
+
+        // [Final Aggregation] 최종 필터링된 결과로 요약 정보 재계산
+        setResult(prev => {
+          if (!prev) return null;
+          const filtered = prev.results;
           const summaryMap: Record<string, any> = {};
-          searchData.results.forEach((item: any) => {
+          filtered.forEach((item: any) => {
             const key = `${item.city || ''}_${item.district || ''}`;
             if (!summaryMap[key]) {
-              summaryMap[key] = {
-                city: item.city || '',
-                district: item.district || '',
-                count: 0,
-                total_households: 0,
-                total_units: 0,
-                total_price_4w: 0,
-                total_unit_price: 0
-              };
+              summaryMap[key] = { city: item.city || '', district: item.district || '', count: 0, total_households: 0, total_units: 0, total_price_4w: 0, total_unit_price: 0 };
             }
             summaryMap[key].count++;
-            summaryMap[key].total_households += Number(item.households || 0);
-            summaryMap[key].total_units += Number(item.units || 0);
-            summaryMap[key].total_price_4w += Number(item.price_4w || 0);
-            summaryMap[key].total_unit_price += Number(item.unit_price || 0);
+            summaryMap[key].total_households += (item.households || 0);
+            summaryMap[key].total_units += (item.units || 0);
+            summaryMap[key].total_price_4w += (item.price_4w || 0);
+            summaryMap[key].total_unit_price += (item.unit_price || 0);
           });
-
-          searchData.summaries = Object.values(summaryMap).map((s: any) => ({
-            ...s,
-            avg_unit_price: s.count > 0 ? Math.round(s.total_unit_price / s.count) : 0
-          }));
-
-          searchData.results.forEach((item: any) => {
-            item.area_pyeong = formatPyeong(item.area_pyeong);
-          });
-          searchData.results.sort((a: any, b: any) => a.distance_km - b.distance_km);
-          searchData.center = { lat: centerLat, lng: centerLng, address: address.trim() };
-          searchData.radii = selectedRadii;
-          searchData.total_count = searchData.results.length;
-          searchData.total_households = searchData.results.reduce((acc: number, cur: any) => acc + (cur.households || 0), 0);
-          searchData.total_units = searchData.results.reduce((acc: number, cur: any) => acc + (cur.units || 0), 0);
-          searchData.total_price_4w = searchData.results.reduce((acc: number, cur: any) => acc + (cur.price_4w || 0), 0);
-        }
-        
-        setResult(searchData);
+          return {
+            ...prev,
+            summaries: Object.values(summaryMap).map((s: any) => ({ ...s, avg_unit_price: s.count > 0 ? Math.round(s.total_unit_price / s.count) : 0 })),
+            total_count: filtered.length,
+            total_households: filtered.reduce((acc, cur) => acc + (cur.households || 0), 0),
+            total_units: filtered.reduce((acc, cur) => acc + (cur.units || 0), 0),
+            total_price_4w: filtered.reduce((acc, cur) => acc + (cur.price_4w || 0), 0),
+          };
+        });
+      } else {
       } else {
         let effectiveDistricts = selectedDistricts;
 
