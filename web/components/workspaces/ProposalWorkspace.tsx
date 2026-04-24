@@ -192,6 +192,25 @@ export default function ProposalWorkspace() {
     setIsSearching(true);
     setError('');
     setResult(null);
+
+    const tryClientSideGeocode = (data: SearchResponse) => {
+      if (data.results && typeof window !== 'undefined' && window.kakao?.maps?.services) {
+        const geocoder = new window.kakao.maps.services.Geocoder();
+        data.results.forEach((item: any) => {
+          if (!item.lat || item.lat === 0 || item.lat === 37.5665) {
+            const query = item.addr_road || item.addr_parcel || `${item.city} ${item.district} ${item.name}`;
+            geocoder.addressSearch(query, (res: any, status: any) => {
+              if (status === window.kakao.maps.services.Status.OK && res[0]) {
+                item.lat = parseFloat(res[0].y);
+                item.lng = parseFloat(res[0].x);
+                setResult(prev => prev ? { ...prev, results: [...prev.results] } : prev);
+              }
+            });
+          }
+        });
+      }
+    };
+
     try {
       if (searchMode === 'radius') {
         if (!address.trim()) { setError('주소를 입력해주세요.'); return; }
@@ -216,6 +235,7 @@ export default function ProposalWorkspace() {
         });
         const searchData = await searchResp.json();
         if (!searchResp.ok) { setError(searchData.error || '검색 실패'); return; }
+        tryClientSideGeocode(searchData);
         setResult(searchData);
       } else {
         let effectiveDistricts = selectedDistricts;
@@ -251,6 +271,7 @@ export default function ProposalWorkspace() {
         });
         const searchData = await searchResp.json();
         if (!searchResp.ok) { setError(searchData.error || '검색 실패'); return; }
+        tryClientSideGeocode(searchData);
         setResult(searchData);
       }
       setActiveTab('summary');
