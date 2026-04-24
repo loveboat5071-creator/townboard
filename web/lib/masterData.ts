@@ -582,8 +582,8 @@ export async function searchByDistrict(req: {
     const isMatched = (
       complexCity.includes(target) || 
       complexDistrict.includes(target) ||
-      (target === '미추홀' && complexDistrict === '남') ||
-      (target === '남' && complexDistrict === '미추홀')
+      (target === '미추홀' && complexDistrict === '남' && complexCity.includes('인천')) ||
+      (target === '남' && complexDistrict === '미추홀' && complexCity.includes('인천'))
     );
     if (!isMatched) continue;
     if (require_ev && !complex.ev_charger_installed) continue;
