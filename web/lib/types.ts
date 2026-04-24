@@ -192,4 +192,5 @@ export interface SearchResponse {
   total_households: number;
   total_units: number;
   total_price_4w: number;
+  debug_total_scanned?: number;
 }
