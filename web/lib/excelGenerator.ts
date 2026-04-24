@@ -315,14 +315,24 @@ function buildListSheet(
       c.price_4w,
     ];
     // Filter vals by visible indices
+    const visibleOrigIndices = visibleIndices.map((vis, idx) => vis ? idx : -1).filter(idx => idx !== -1);
     const vals = allVals.filter((_, i) => visibleIndices[i]);
+
     vals.forEach((v, i) => {
+      const origIdx = visibleOrigIndices[i];
+      const colKey = LIST_COL_KEYS[origIdx];
       const cell = ws.getCell(row, i + 2);
+      
       cell.value = v as ExcelJS.CellValue;
       cell.font = VALUE_FONT;
       cell.border = BORDERS;
-      if (typeof v === 'number') {
+
+      // 숫자 서식 적용 (입주년도와 평형은 제외 - 텍스트 유지)
+      if (typeof v === 'number' && colKey !== 'built_year' && colKey !== 'area_pyeong') {
         cell.numFmt = NUM_FMT;
+      } else if (colKey === 'built_year' || colKey === 'area_pyeong') {
+        // 텍스트로 강제 인식하여 쉼표 변형 방지
+        cell.numFmt = '@'; 
       }
     });
     row++;

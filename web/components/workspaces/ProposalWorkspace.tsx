@@ -198,9 +198,9 @@ export default function ProposalWorkspace() {
       if (data.results && typeof win !== 'undefined' && win.kakao?.maps?.services) {
         const geocoder = new win.kakao.maps.services.Geocoder();
         data.results.forEach((item: any) => {
-          // 좌표가 없거나 기본값인 경우 더 넓은 범위로 체크
-          const lat = parseFloat(item.lat || '0');
-          if (lat <= 0 || lat === 37.5665) {
+          // 좌표가 없거나(null/undefined), 0이거나, 기본값인 경우 모두 체크
+          const lat = parseFloat(String(item.lat || '0'));
+          if (!lat || lat <= 0 || lat === 37.5665) {
             const query = (item.addr_road || item.addr_parcel || `${item.city || ''} ${item.district || ''} ${item.name}`).trim();
             if (!query) return;
 
@@ -208,7 +208,6 @@ export default function ProposalWorkspace() {
               if (status === win.kakao.maps.services.Status.OK && res[0]) {
                 item.lat = parseFloat(res[0].y);
                 item.lng = parseFloat(res[0].x);
-                // 즉시 상태 업데이트를 통해 지도에 마커 표시
                 setResult(prev => prev ? { ...prev, results: [...prev.results] } : prev);
               }
             });
@@ -291,8 +290,8 @@ export default function ProposalWorkspace() {
             const geocoder = new win.kakao.maps.services.Geocoder();
             const promises = searchData.results.map((item: any) => {
               return new Promise<void>((resolve) => {
-                const lat = parseFloat(item.lat || '0');
-                if (lat <= 0 || lat === 37.5665) {
+                const lat = parseFloat(String(item.lat || '0'));
+                if (!lat || lat <= 0 || lat === 37.5665) {
                   const q = (item.addr_road || item.addr_parcel || `${item.city || ''} ${item.district || ''} ${item.name}`).trim();
                   if (!q) { resolve(); return; }
                   geocoder.addressSearch(q, (res: any, status: any) => {
