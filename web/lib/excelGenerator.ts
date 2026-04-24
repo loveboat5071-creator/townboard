@@ -342,6 +342,16 @@ function buildListSheet(
         cell.font = VALUE_FONT;
         cell.border = BORDERS;
 
+        // 가운데 정렬 (요청 항목: NO, 지역1, 지역2, 지역3, 구분, 입주년도, 평형, 세대수, 가동수량)
+        // NO는 0번 인덱스에 준하므로 (이 로직에선 i+2 등 고려) 
+        // 여기서는 colKey가 null이면 NO 컬럼임을 감안하거나, 명시된 키들을 체크
+        const centeredKeys = ['building_type', 'built_year', 'city', 'district', 'dong', 'area_pyeong', 'households', 'units'];
+        if (colKey === null || centeredKeys.includes(colKey as string)) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        } else {
+          cell.alignment = { vertical: 'middle' };
+        }
+
         // 숫자 서식 적용 (입주년도와 평형은 제외 - 텍스트 유지)
         if (typeof v === 'number' && colKey !== 'built_year' && colKey !== 'area_pyeong') {
           cell.numFmt = NUM_FMT;

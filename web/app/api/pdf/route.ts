@@ -97,17 +97,17 @@ function buildPdfHtml(
   const available = data.results.filter(r => r.restriction_status === 'available');
 
   const listRows = available.map((c, i) => {
-    const cells: string[] = [`<td>${i + 1}</td>`];
+    const cells: string[] = [`<td class="center">${i + 1}</td>`];
     if (col('name')) cells.push(`<td><div class="cell-clamp">${escapeHtml(c.name)}</div></td>`);
-    if (col('city')) cells.push(`<td>${escapeHtml(c.city || '')}</td>`);
-    if (col('district')) cells.push(`<td>${escapeHtml(c.district || '')}</td>`);
-    if (col('dong')) cells.push(`<td>${escapeHtml(c.dong || '')}</td>`);
+    if (col('city')) cells.push(`<td class="center">${escapeHtml(c.city || '')}</td>`);
+    if (col('district')) cells.push(`<td class="center">${escapeHtml(c.district || '')}</td>`);
+    if (col('dong')) cells.push(`<td class="center">${escapeHtml(c.dong || '')}</td>`);
     if (col('addr_road')) cells.push(`<td class="addr"><div class="cell-clamp">${escapeHtml(formatAddressWithSpaces(c.addr_road || c.addr_parcel || ''))}</div></td>`);
-    if (col('building_type')) cells.push(`<td>${escapeHtml(shortType(c.building_type))}</td>`);
-    if (col('built_year')) cells.push(`<td class="num">${c.built_year || '-'}</td>`);
-    if (col('area_pyeong')) cells.push(`<td>${escapeHtml(formatPyeong(c.area_pyeong))}</td>`);
-    if (col('households')) cells.push(`<td class="num">${fmt(c.households)}</td>`);
-    if (col('units')) cells.push(`<td class="num">${fmt(c.units)}</td>`);
+    if (col('building_type')) cells.push(`<td class="center">${escapeHtml(shortType(c.building_type))}</td>`);
+    if (col('built_year')) cells.push(`<td class="center">${c.built_year || '-'}</td>`);
+    if (col('area_pyeong')) cells.push(`<td class="center">${escapeHtml(formatPyeong(c.area_pyeong))}</td>`);
+    if (col('households')) cells.push(`<td class="center">${fmt(c.households)}</td>`);
+    if (col('units')) cells.push(`<td class="center">${fmt(c.units)}</td>`);
     if (col('unit_price')) cells.push(`<td class="num">${fmt(c.unit_price)}</td>`);
     if (col('price_4w')) cells.push(`<td class="num">${fmt(c.price_4w)}</td>`);
     return `<tr>${cells.join('')}</tr>`;
@@ -198,6 +198,7 @@ function buildPdfHtml(
   th { background: #4472C4; color: white; font-weight: 600; padding: 4px 4px; text-align: center; font-size: 8px; }
   td { padding: 3px 4px; border: 1px solid #ddd; font-size: 8px; }
   .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .center { text-align: center; }
   .addr { max-width: 140px; }
   /* 셀 텍스트 최대 2줄 → 넘치면 말줄임 */
   td, th { max-height: 2.4em; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; }

@@ -843,21 +843,21 @@ function buildListSlides(
     getValue: (c: MatchedComplex, idx: number) => string;
   };
   const allCols: ColDef[] = [
-    { key: '_no', header: 'No', width: 0.48, align: 'center', getValue: (_c, idx) => String(idx) },
-    { key: 'name', header: '단지명', width: 2.56, align: 'left', getValue: (c) => c.name },
-    { key: 'district', header: '행정동', width: 1.64, align: 'center', getValue: (c) => `${c.district} ${c.dong}`.trim() },
-    { key: 'households', header: '세대', width: 0.68, align: 'right', getValue: (c) => fmt(c.households) },
-    { key: 'population', header: '인구', width: 0.73, align: 'right', getValue: (c) => fmt(c.population) },
-    { key: 'built_year', header: '준공', width: 0.66, align: 'center', getValue: (c) => c.built_year != null ? String(c.built_year) : '-' },
-    { key: 'floors', header: '층', width: 0.48, align: 'center', getValue: (c) => c.floors != null ? String(c.floors) : '-' },
-    { key: 'area_pyeong', header: '평형', width: 0.54, align: 'center', getValue: (c) => c.area_pyeong != null ? String(c.area_pyeong) : '-' },
-    { key: 'units', header: '수량', width: 0.63, align: 'right', getValue: (c) => fmt(c.units) },
-    { key: 'unit_price', header: '단가', width: 0.92, align: 'right', getValue: (c) => fmt(c.unit_price) },
-    { key: 'price_4w', header: '4주', width: 1.02, align: 'right', getValue: (c) => fmt(c.price_4w) },
-    { key: 'ev_charger', header: 'EV', width: 0.4, align: 'center', getValue: (c) => c.ev_charger_installed ? 'Y' : '-' },
+    { key: '_no', header: 'No', width: 0.40, align: 'center', getValue: (_c, idx) => String(idx) },
+    { key: 'name', header: '단지명', width: 2.10, align: 'left', getValue: (c) => c.name },
+    { key: 'city', header: '지역1', width: 0.60, align: 'center', getValue: (c) => (c.city || '').slice(0, 2) },
+    { key: 'district', header: '지역2', width: 0.80, align: 'center', getValue: (c) => c.district || '' },
+    { key: 'dong', header: '지역3', width: 0.80, align: 'center', getValue: (c) => c.dong || '' },
+    { key: 'building_type', header: '구분', width: 0.45, align: 'center', getValue: (c) => (c as any).building_type ? ((c as any).building_type.includes('아파트') ? '아' : '오') : '-' },
+    { key: 'built_year', header: '입주년도', width: 0.70, align: 'center', getValue: (c) => c.built_year != null ? String(c.built_year) : '-' },
+    { key: 'area_pyeong', header: '평형', width: 0.65, align: 'center', getValue: (c) => c.area_pyeong != null ? String(c.area_pyeong) : '-' },
+    { key: 'households', header: '세대수', width: 0.70, align: 'center', getValue: (c) => fmt(c.households) },
+    { key: 'units', header: '가동수량', width: 0.70, align: 'center', getValue: (c) => fmt(c.units) },
+    { key: 'unit_price', header: '개별단가', width: 0.85, align: 'right', getValue: (c) => fmt(c.unit_price) },
+    { key: 'price_4w', header: '총단가', width: 0.95, align: 'right', getValue: (c) => fmt(c.price_4w) },
   ];
   if (hasRadii) {
-    allCols.push({ key: 'distance', header: '거리', width: 0.72, align: 'right', getValue: (c) => `${c.distance_km.toFixed(1)}km` });
+    allCols.push({ key: 'distance', header: '거리', width: 0.65, align: 'right', getValue: (c) => `${c.distance_km.toFixed(1)}km` });
   }
   // _no is always shown; filter the rest by excludedColumns
   const visibleCols = allCols.filter(c => c.key === '_no' || col(c.key));
