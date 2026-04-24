@@ -471,13 +471,21 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
   );
   const matched: MatchedComplex[] = [];
 
+  let recoveredCount = 0;
   for (const complex of data) {
-    // [Self-Healing] 좌표가 없거나 기본값(37.56, 0)인 경우 실시간 복구 시도
+    // [Self-Healing] 좌표가 없거나 기본값인 경우 실시간 복구 시도 (성능을 위해 한 번에 최대 30개까지만)
     let finalLat = Number(complex.lat || 0);
     let finalLng = Number(complex.lng || 0);
     const isInvalidGeo = !finalLat || finalLat === 37.5665 || !finalLng;
 
-    if (isInvalidGeo) continue;
+    if (isInvalidGeo && complex.addr_road && recoveredCount < 30) {
+      const recovered = await fetchKakaoLocationInternal(complex.addr_road);
+      if (recovered) {
+        finalLat = recovered.lat;
+        finalLng = recovered.lng;
+        recoveredCount++;
+      }
+    }
 
     if (!finalLat || finalLat === 0 || finalLat === 37.5665) continue;
 
