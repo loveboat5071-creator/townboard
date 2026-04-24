@@ -473,6 +473,9 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
 
   // [Targeted Healing] 현재 검색 주소와 관련된 키워드 추출
   const searchKeywords = (address || '').split(/\s+/).filter(k => k.length >= 2);
+  // '시/도' 같은 너무 넓은 키워드는 제외하여 정밀 타격
+  const specificKeywords = searchKeywords.filter(k => !/^(서울|경기|인천|부산|대구|광주|대전|울산|세종|강원|충북|충남|전북|전남|경북|경남|제주)/.test(k));
+  
   let recoveredCount = 0;
 
   for (const complex of data) {
@@ -482,8 +485,11 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
     const isInvalidGeo = !finalLat || finalLat === 37.5665 || !finalLng;
 
     if (isInvalidGeo && complex.addr_road && recoveredCount < 30) {
-      const complexText = `${complex.city} ${complex.district}`;
-      const isRelevant = searchKeywords.some(k => complexText.includes(k));
+      const complexText = `${complex.city} ${complex.district} ${complex.dong || ''} ${complex.name || ''} ${complex.addr_road}`;
+      
+      const isRelevant = specificKeywords.length > 0 
+        ? specificKeywords.some(k => complexText.includes(k)) 
+        : searchKeywords.some(k => complexText.includes(k));
       
       if (isRelevant) {
         const recovered = await fetchKakaoLocationInternal(complex.addr_road);
