@@ -491,12 +491,22 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
   const matched: MatchedComplex[] = [];
 
   for (const complex of data) {
-    if (
-      typeof complex.lat !== 'number' ||
-      typeof complex.lng !== 'number' ||
-      !Number.isFinite(complex.lat) ||
-      !Number.isFinite(complex.lng)
-    ) continue;
+    // [Self-Healing] 좌표가 없거나 기본값(37.56, 0)인 경우 실시간 복구 시도
+    let finalLat = Number(complex.lat || 0);
+    let finalLng = Number(complex.lng || 0);
+    const isInvalidGeo = !finalLat || finalLat === 37.5665 || !finalLng;
+
+    if (isInvalidGeo && complex.addr_road) {
+      // 카카오 API로 실시간 좌표 복구 (속도/할당량 고려: 주소가 있고 아직 안찾은 경우만)
+      const recovered = await fetchKakaoLocationInternal(complex.addr_road);
+      if (recovered) {
+        finalLat = recovered.lat;
+        finalLng = recovered.lng;
+      }
+    }
+
+    if (!finalLat || finalLat === 0 || finalLat === 37.5665) continue;
+
     if (districtSet.size > 0 && !districtSet.has(normalizeFilterText(complex.district))) {
       continue;
     }
@@ -504,15 +514,22 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
       continue;
     }
 
-    const dist = haversineDistance(lat, lng, complex.lat, complex.lng);
+    const dist = haversineDistance(lat, lng, finalLat, finalLng);
     if (dist > maxRadius) continue;
 
     const restrictionStatus = checkRestriction(complex, advertiser_industry, campaignDateObj);
     const classified = classifyByRadius(dist, radii);
     if (!classified) continue;
 
+    // 단지총단가 보정 (누락시 계산)
+    let finalPrice = Number(complex.price_4w || 0);
+    if (finalPrice <= 0) finalPrice = (complex.units || 0) * (complex.unit_price || 0);
+
     matched.push({
       ...complex,
+      lat: finalLat,
+      lng: finalLng,
+      price_4w: finalPrice,
       distance_km: classified.distance_km,
       radius_band: classified.radius_band,
       restriction_status: restrictionStatus,
@@ -657,4 +674,27 @@ export async function searchByDistrict(req: {
     total_units: available.reduce((s, c) => s + (c.units || 0), 0),
     total_price_4w: available.reduce((s, c) => s + (c.price_4w || 0), 0),
   };
+}
+
+async function fetchKakaoLocationInternal(address: string): Promise<{ lat: number; lng: number } | null> {
+  const apiKey = (process.env.KAKAO_API_KEY || '').trim();
+  if (!apiKey) return null;
+
+  try {
+    const response = await fetch(
+      `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(address)}`,
+      { headers: { Authorization: `KakaoAK ${apiKey}` }, cache: 'no-store' }
+    );
+    if (!response.ok) return null;
+    const payload = await response.json();
+    const doc = payload.documents?.[0];
+    if (!doc) return null;
+
+    const lat = Number(doc.y);
+    const lng = Number(doc.x);
+    if (lat && lng) return { lat, lng };
+  } catch (e) {
+    console.warn(`[Self-Healing] Coords fetch failed for ${address}:`, e);
+  }
+  return null;
 }

@@ -289,22 +289,21 @@ export async function GET(req: NextRequest) {
     console.warn('[Geocode] KAKAO_API_KEY is missing from process.env. Please check Vercel environment variables.');
   }
 
-  // ── 1. 카카오 API ──
+  // ── 1. 카카오 API (주소 우선) ──
   if (apiKey) {
     try {
-      const keywordResult = await fetchKakaoLocation(address, apiKey, 'keyword');
-      if (keywordResult) {
-        return NextResponse.json({
-          ...keywordResult,
-          source: 'kakao',
-        });
-      }
-
       const addressResult = await fetchKakaoLocation(address, apiKey, 'address');
       if (addressResult) {
         return NextResponse.json({
           ...addressResult,
-          address: addressResult.address || address,
+          source: 'kakao',
+        });
+      }
+
+      const keywordResult = await fetchKakaoLocation(address, apiKey, 'keyword');
+      if (keywordResult) {
+        return NextResponse.json({
+          ...keywordResult,
           source: 'kakao',
         });
       }
