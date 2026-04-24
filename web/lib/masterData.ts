@@ -527,15 +527,15 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
       }
     }
 
-    // 좌표가 없더라도 같은 도시/구에 속한다면 일단 포함 (클라이언트에서 복구할 기회를 줌)
-    const isNearEnoughToTry = complexCity && searchCity && (complexCity.includes(searchCity) || searchCity.includes(complexCity));
+    // 좌표가 없더라도 선택한 행정구역(targetDistrict)에 속한다면 일단 포함 (클라이언트에서 복구할 기회를 줌)
+    const isTargetDistrict = complexDistrict && targetDistrict && (complexDistrict.includes(targetDistrict) || targetDistrict.includes(complexDistrict));
     
     if (
       (typeof complex.lat !== 'number' ||
       typeof complex.lng !== 'number' ||
       !Number.isFinite(complex.lat) ||
       !Number.isFinite(complex.lng) ||
-      complex.lat === 0) && !isNearEnoughToTry
+      complex.lat === 0) && !isTargetDistrict
     ) continue;
 
     // 좌표가 있는 경우에만 거리 계산. 없으면 0으로 일단 처리
