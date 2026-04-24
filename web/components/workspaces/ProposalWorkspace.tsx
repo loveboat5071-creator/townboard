@@ -318,9 +318,10 @@ export default function ProposalWorkspace() {
           item.area_pyeong = formatPyeong(item.area_pyeong);
         });
         
-        // 서버에서 온 시 단위 요약 정보는 혼란을 줄 수 있으므로 즉시 필터링 전까진 초기화
+        // 서버에서 온 시 단위 요약 정보는 혼란을 줄 수 있으므로 즉시 초기화
         setResult({ 
           ...searchData, 
+          results: [...searchData.results], // 일단 원본 데이터 유지 (Progressive 노출용)
           summaries: [],
           total_count: 0, total_households: 0, total_units: 0, total_price_4w: 0
         });
@@ -352,6 +353,7 @@ export default function ProposalWorkspace() {
         const win = window as any;
         const geocoder = win.kakao?.maps?.services ? new win.kakao.maps.services.Geocoder() : null;
         const getDist = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+          if (!lat1 || !lng1 || !lat2 || !lng2) return 999;
           const R = 6371;
           const dLat = (lat2 - lat1) * Math.PI / 180;
           const dLng = (lng2 - lng1) * Math.PI / 180;
@@ -386,20 +388,16 @@ export default function ProposalWorkspace() {
             });
           }));
           
-          // 중간 결과 업데이트 (좌표가 없는 것도 일단 다 보여줌)
+          // 중간 결과 업데이트 (좌석이 확보된 아파트 먼저, 나머지도 일단 노출)
           const currentFiltered = finalResults.filter(item => {
-            if (!item.lat || item.lat === 0 || item.lat === 37.5665) return true; // 좌표 없으면 일단 노출
+            if (!item.lat || item.lat === 0 || item.lat === 37.5665) return true; // 위치 복구 중이면 일단 포함
             return item.distance_km <= maxRadiusKm;
           });
           const stats = recalculateAll(currentFiltered);
           setResult(prev => prev ? { 
             ...prev, 
             ...stats,
-            results: [...currentFiltered].sort((a, b) => {
-              if (!a.distance_km) return 1;
-              if (!b.distance_km) return -1;
-              return a.distance_km - b.distance_km;
-            }) 
+            results: [...currentFiltered].sort((a, b) => (a.distance_km || 999) - (b.distance_km || 999)) 
           } : null);
           
           if (i + batchSize < finalResults.length) await new Promise(r => setTimeout(r, 100));

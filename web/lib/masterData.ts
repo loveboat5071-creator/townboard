@@ -498,10 +498,20 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
     if (require_ev && !complex.ev_charger_installed) continue;
 
     const complexDistrict = normalizeFilterText(complex.district || '');
+    const complexCity = normalizeFilterText(complex.city || '');
+    const searchCity = address.split(/\s+/)[0] ? normalizeFilterText(address.split(/\s+/)[0]) : '';
 
-    // 구 단위 필터가 있는 경우
-    if (districtSet.size > 0 && !districtSet.has(complexDistrict)) {
-      continue;
+    // [District Filter] 반경 검색 시에도 일단 해당 '구' 데이터만 가져와서 브라우저 부하 방지
+    const isSameDistrict = complexDistrict && targetDistrict && (complexDistrict.includes(targetDistrict) || targetDistrict.includes(complexDistrict));
+    const isNearByGu = (targetDistrict === '미추홀구' && complexDistrict === '남구') || (targetDistrict === '남구' && complexDistrict === '미추홀구');
+    
+    if (!(isSameDistrict || isNearByGu)) {
+      // 도시 이름이라도 같으면 일단 통과 (필요 시 더 넓게 볼 수도 있음)
+      if (!(complexCity && searchCity && (complexCity.includes(searchCity) || searchCity.includes(complexCity)))) {
+        continue;
+      }
+      // 하지만 너무 멀리 있는 광역 매칭은 '구' 필터가 있을 때 무시
+      if (targetDistrict) continue;
     }
 
     // 좌표가 없더라도 선택한 행정구역(targetDistrict)에 속한다면 일단 포함 (클라이언트에서 복구할 기회를 줌)
