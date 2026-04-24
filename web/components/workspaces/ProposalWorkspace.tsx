@@ -277,19 +277,9 @@ export default function ProposalWorkspace() {
           return;
         }
 
-        // [Simplified District Extraction] 주소에서 '구/군' 단위만 추출하여 정밀 타격
-        const districtMatches = address.match(/(\S+(?:구|군))/g) || [];
-        const searchDistricts = [...districtMatches];
-        if (geoData.district && !searchDistricts.includes(geoData.district)) {
-          searchDistricts.push(geoData.district);
-        }
-        
-        // 검색어가 너무 광범위해지는 것을 막기 위해 '시' 단위(인천 등)는 명시적으로 제거
-        const cleanedDistricts = searchDistricts.filter(d => !d.endsWith('시'));
-        const finalRequestDistricts = cleanedDistricts.length > 0 ? cleanedDistricts : searchDistricts;
-
         const centerLat = geoData.lat;
         const centerLng = geoData.lng;
+        const finalRequestDistricts: string[] = []; // 반경 검색 시에는 지역 제한을 두지 않음 (순수 좌표 검색)
 
         // [Original App Strategy] 서버의 /api/search를 직접 호출하여 단 한 번에 완벽한 결과를 가져옴
         const searchResp = await fetch('/api/search', {
