@@ -249,13 +249,15 @@ export default function ProposalWorkspace() {
         const geoResp = await fetch(`/api/geocode?address=${encodeURIComponent(address)}`);
         const serverGeo = await geoResp.json();
         
-        // 지오코딩 정밀도 진단
-        let diagInfo = '';
-        if (serverGeo.diagnostics?.is_key_missing) {
-          diagInfo = '카카오 API 키 설정 확인 필요 (서버에서 키를 찾지 못함)';
-        } else if (serverGeo.diagnostics?.source === 'offline_fallback') {
-          diagInfo = '정밀 주소 검색 실패: 오프라인 구 단위 fallback 좌표 사용 중';
-        }
+        // 지오코딩 정밀도 진단 (항상 출처와 좌표 노출)
+        const geoSrc = serverGeo.diagnostics?.source || serverGeo.source || 'unknown';
+        const isKeyBroken = serverGeo.diagnostics?.is_key_missing;
+        const diagInfo = [
+          `[Server Diagnostics]`,
+          `Source: ${geoSrc}${isKeyBroken ? ' (API Key Missing!)' : ''}`,
+          `Coords: ${serverGeo.lat}, ${serverGeo.lng}`,
+          serverGeo.warning ? `Warning: ${serverGeo.warning}` : ''
+        ].filter(Boolean).join(' | ');
 
         if (geoResp.ok && serverGeo.lat) {
           geoData = serverGeo;
