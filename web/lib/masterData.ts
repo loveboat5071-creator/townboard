@@ -528,7 +528,12 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
     }
 
     // 좌표가 없더라도 선택한 행정구역(targetDistrict)에 속한다면 일단 포함 (클라이언트에서 복구할 기회를 줌)
-    const isTargetDistrict = complexDistrict && targetDistrict && (complexDistrict.includes(targetDistrict) || targetDistrict.includes(complexDistrict));
+    const isTargetDistrict = complexDistrict && targetDistrict && (
+      complexDistrict.includes(targetDistrict) || 
+      targetDistrict.includes(complexDistrict) ||
+      (targetDistrict === '미추홀구' && complexDistrict === '남구') ||
+      (targetDistrict === '남구' && complexDistrict === '미추홀구')
+    );
     
     if (
       (typeof complex.lat !== 'number' ||

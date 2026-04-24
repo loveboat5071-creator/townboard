@@ -310,14 +310,43 @@ export default function ProposalWorkspace() {
         const centerLng = geoData.lng;
         const maxRadiusKm = Math.max(...selectedRadii);
 
-        // [Progressive Rendering] 일단 가져온 데이터를 즉시 화면에 노출 (0건 방지)
+        // [Progressive Rendering] 일단 가져온 데이터를 즉시 화면에 노출
         searchData.center = { lat: centerLat, lng: centerLng, address: address.trim() };
         searchData.radii = selectedRadii;
         searchData.results.forEach((item: any) => {
           item.distance_km = 0; // 초기값
           item.area_pyeong = formatPyeong(item.area_pyeong);
         });
-        setResult({ ...searchData });
+        
+        // 서버에서 온 시 단위 요약 정보는 혼란을 줄 수 있으므로 즉시 필터링 전까진 초기화
+        setResult({ 
+          ...searchData, 
+          summaries: [],
+          total_count: 0, total_households: 0, total_units: 0, total_price_4w: 0
+        });
+
+        // [Recalculation Helper] 필터링된 결과로 요약 및 통계 재계산
+        const recalculateAll = (filtered: any[]) => {
+          const summaryMap: Record<string, any> = {};
+          filtered.forEach((item: any) => {
+            const key = `${item.city || ''}_${item.district || ''}`;
+            if (!summaryMap[key]) {
+              summaryMap[key] = { city: item.city || '', district: item.district || '', count: 0, total_households: 0, total_units: 0, total_price_4w: 0, total_unit_price: 0 };
+            }
+            summaryMap[key].count++;
+            summaryMap[key].total_households += (item.households || 0);
+            summaryMap[key].total_units += (item.units || 0);
+            summaryMap[key].total_price_4w += (item.price_4w || 0);
+            summaryMap[key].total_unit_price += (item.unit_price || 0);
+          });
+          return {
+            summaries: Object.values(summaryMap).map((s: any) => ({ ...s, avg_unit_price: s.count > 0 ? Math.round(s.total_unit_price / s.count) : 0 })),
+            total_count: filtered.length,
+            total_households: filtered.reduce((acc, cur) => acc + (cur.households || 0), 0),
+            total_units: filtered.reduce((acc, cur) => acc + (cur.units || 0), 0),
+            total_price_4w: filtered.reduce((acc, cur) => acc + (cur.price_4w || 0), 0),
+          };
+        };
 
         // [Background Geocoding & Refinement]
         const win = window as any;
@@ -332,7 +361,7 @@ export default function ProposalWorkspace() {
           return R * 2 * Math.asin(Math.sqrt(a));
         };
 
-        const batchSize = 10;
+        const batchSize = 15;
         let finalResults = [...searchData.results];
 
         for (let i = 0; i < finalResults.length; i += batchSize) {
@@ -357,41 +386,17 @@ export default function ProposalWorkspace() {
             });
           }));
           
-          // 중간 중간 결과를 업데이트하여 마커가 하나둘씩 나타나게 함
+          // 중간 결과 업데이트 (요약 정보 포함)
           const currentFiltered = finalResults.filter(item => !item.distance_km || item.distance_km <= maxRadiusKm);
+          const stats = recalculateAll(currentFiltered);
           setResult(prev => prev ? { 
             ...prev, 
+            ...stats,
             results: [...currentFiltered].sort((a, b) => (a.distance_km || 0) - (b.distance_km || 0)) 
           } : null);
           
           if (i + batchSize < finalResults.length) await new Promise(r => setTimeout(r, 100));
         }
-
-        // [Final Aggregation] 최종 필터링된 결과로 요약 정보 재계산
-        setResult(prev => {
-          if (!prev) return null;
-          const filtered = prev.results;
-          const summaryMap: Record<string, any> = {};
-          filtered.forEach((item: any) => {
-            const key = `${item.city || ''}_${item.district || ''}`;
-            if (!summaryMap[key]) {
-              summaryMap[key] = { city: item.city || '', district: item.district || '', count: 0, total_households: 0, total_units: 0, total_price_4w: 0, total_unit_price: 0 };
-            }
-            summaryMap[key].count++;
-            summaryMap[key].total_households += (item.households || 0);
-            summaryMap[key].total_units += (item.units || 0);
-            summaryMap[key].total_price_4w += (item.price_4w || 0);
-            summaryMap[key].total_unit_price += (item.unit_price || 0);
-          });
-          return {
-            ...prev,
-            summaries: Object.values(summaryMap).map((s: any) => ({ ...s, avg_unit_price: s.count > 0 ? Math.round(s.total_unit_price / s.count) : 0 })),
-            total_count: filtered.length,
-            total_households: filtered.reduce((acc, cur) => acc + (cur.households || 0), 0),
-            total_units: filtered.reduce((acc, cur) => acc + (cur.units || 0), 0),
-            total_price_4w: filtered.reduce((acc, cur) => acc + (cur.price_4w || 0), 0),
-          };
-        });
       } else {
         let effectiveDistricts = selectedDistricts;
 
