@@ -249,16 +249,6 @@ export default function ProposalWorkspace() {
         const geoResp = await fetch(`/api/geocode?address=${encodeURIComponent(address)}`);
         const serverGeo = await geoResp.json();
         
-        // 지오코딩 정밀도 진단 (항상 출처와 좌표 노출)
-        const geoSrc = serverGeo.diagnostics?.source || serverGeo.source || 'unknown';
-        const isKeyBroken = serverGeo.diagnostics?.is_key_missing;
-        let diagInfo = [
-          `[Server Diagnostics]`,
-          `Source: ${geoSrc}${isKeyBroken ? ' (API Key Missing!)' : ''}`,
-          `Coords: ${serverGeo.lat}, ${serverGeo.lng}`,
-          serverGeo.warning ? `Warning: ${serverGeo.warning}` : ''
-        ].filter(Boolean).join(' | ');
-
         if (geoResp.ok && serverGeo.lat) {
           geoData = serverGeo;
         } else if (typeof (window as any) !== 'undefined' && (window as any).kakao?.maps?.services) {
@@ -282,14 +272,10 @@ export default function ProposalWorkspace() {
           });
           if (!clientGeo) { setError(serverGeo.error || '주소를 찾을 수 없습니다.'); return; }
           geoData = clientGeo;
-          if (!diagInfo) diagInfo = '서버 지오코딩 실패로 브라우저(클라이언트) 검색 결과 사용 중';
         } else {
           setError(serverGeo.error || '주소 변환 실패');
           return;
         }
-
-        // 진단 정보를 SearchResult에 저장하여 UI로 전달 (기존 Result 타입 활용)
-        const currentDiagInfo = diagInfo;
 
         // [Simplified District Extraction] 주소에서 '구/군' 단위만 추출하여 정밀 타격
         const districtMatches = address.match(/(\S+(?:구|군))/g) || [];
@@ -326,28 +312,15 @@ export default function ProposalWorkspace() {
         
         const searchData = await searchResp.json();
         
-        // 검색 결과에 지오코딩 진단 정보 강제 주입
-        const augmentedData = {
-          ...searchData,
-          debug_info: currentDiagInfo || searchData.debug_info
-        };
-        
-        setResult(augmentedData); 
-        
-        if (!searchResp.ok) {
-          setError(searchData.error || '검색 중 오류가 발생했습니다.');
-          return;
-        }
-
         if (!searchData.results || searchData.results.length === 0) {
-          setResult(augmentedData); 
-          setError(`해당 지역에 검색된 아파트가 없습니다. 주소를 다시 확인해주세요. (${diagInfo})`);
+          setResult(searchData); 
+          setError('해당 지역에 검색된 아파트가 없습니다. 주소를 다시 확인해주세요.');
           return;
         }
 
         // 결과 반영 (Center 정보 포함)
         setResult({
-          ...augmentedData,
+          ...searchData,
           center: { lat: centerLat, lng: centerLng, address: address.trim() },
           radii: selectedRadii
         });

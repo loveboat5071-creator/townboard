@@ -249,20 +249,11 @@ export default function SearchForm({
 
       <div className="btn-row">
         <button className="btn btn-primary" onClick={onSearch} disabled={isSearching} style={{ flex: 1 }}>
-          {isSearching ? <><span className="loading-spinner" /> 검색 중...</> : '🔍 진단 검색(v2)'}
+          {isSearching ? <><span className="loading-spinner" /> 검색 중...</> : '🔍 검색'}
         </button>
       </div>
 
       {error && <ErrorBanner error={error} onDismiss={onDismissError} onRetry={onSearch} debugInfo={debugInfo} />}
-      {debugInfo && (
-        <div style={{ marginTop: '12px', padding: '10px', backgroundColor: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '6px', color: '#be123c', fontSize: '11px', lineHeight: '1.4', wordBreak: 'break-all' }}>
-          <strong>🔍 시스템 진단 정보:</strong><br />
-          {debugInfo}
-          <div style={{ marginTop: 4, opacity: 0.8 }}>
-            (이 메시지가 보이면 Vercel 설정을 체크하세요)
-          </div>
-        </div>
-      )}
     </div>
   );
 }
