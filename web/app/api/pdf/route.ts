@@ -413,7 +413,9 @@ ${includeCreative ? `
   <div class="header">
     <h1 style="font-size:16px">📍 송출지역 지도</h1>
   </div>
-  <p style="text-align:center;color:#666;margin-bottom:12px;">${safeAddress} — 반경 ${escapeHtml(radiiArr.join(', '))}km</p>
+  <p style="text-align:center;color:#666;margin-bottom:12px;">
+    ${safeAddress} — ${radiiArr.length > 0 ? `반경 ${escapeHtml(radiiArr.join(', '))}km` : '지역별 조회 기준'}
+  </p>
   <div id="pdfMap" style="width:680px;height:500px;border:1px solid #ccc;border-radius:4px;margin:0 auto;"></div>
   <p style="font-size:11px;color:#999;margin-top:8px;text-align:center;">※ 인쇄 전 지도가 완전히 로드된 것을 확인한 후 인쇄해주세요.</p>
 </div>
@@ -437,7 +439,8 @@ kakao.maps.load(function() {
   // 반경 원 (반경 모드만)
   if (hasCenter && radii.length > 0) {
     var colors = ['#3182f6','#00c471','#f59e0b','#f04452','#8b5cf6','#06b6d4'];
-    radii.sort(function(a,b){return a-b;}).forEach(function(r, i) {
+    var sortedRadii = radii.slice().sort(function(a,b){return a-b;});
+    sortedRadii.forEach(function(r, i) {
       new kakao.maps.Circle({
         center: center,
         radius: r * 1000,
@@ -451,12 +454,18 @@ kakao.maps.load(function() {
     });
     // 중심 마커
     new kakao.maps.Marker({ position: center, map: map });
+    
     // 반경 기준 bounds 확장
-    var maxR = Math.max.apply(null, radii);
-    var latDelta = maxR / 111;
-    var lngDelta = maxR / (111 * Math.cos(centerLat * Math.PI / 180));
-    bounds.extend(new kakao.maps.LatLng(centerLat - latDelta, centerLng - lngDelta));
-    bounds.extend(new kakao.maps.LatLng(centerLat + latDelta, centerLng + lngDelta));
+    var maxR = Math.max.apply(null, sortedRadii);
+    if (maxR > 0) {
+      var latDelta = maxR / 111;
+      var lngDelta = maxR / (111 * Math.cos(centerLat * Math.PI / 180));
+      bounds.extend(new kakao.maps.LatLng(centerLat - latDelta, centerLng - lngDelta));
+      bounds.extend(new kakao.maps.LatLng(centerLat + latDelta, centerLng + lngDelta));
+    }
+  } else if (hasCenter) {
+    // 지역별 모드 등 반경이 없을 때
+    bounds.extend(center);
   }
 
   // 단지 마커
