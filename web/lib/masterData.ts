@@ -477,14 +477,7 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
     let finalLng = Number(complex.lng || 0);
     const isInvalidGeo = !finalLat || finalLat === 37.5665 || !finalLng;
 
-    if (isInvalidGeo && complex.addr_road) {
-      // 카카오 API로 실시간 좌표 복구 (속도/할당량 고려: 주소가 있고 아직 안찾은 경우만)
-      const recovered = await fetchKakaoLocationInternal(complex.addr_road);
-      if (recovered) {
-        finalLat = recovered.lat;
-        finalLng = recovered.lng;
-      }
-    }
+    if (isInvalidGeo) continue;
 
     if (!finalLat || finalLat === 0 || finalLat === 37.5665) continue;
 
