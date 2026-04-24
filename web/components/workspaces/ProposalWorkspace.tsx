@@ -215,9 +215,31 @@ export default function ProposalWorkspace() {
       if (searchMode === 'radius') {
         if (!address.trim()) { setError('주소를 입력해주세요.'); return; }
         if (selectedRadii.length === 0) { setError('최소 하나의 반경을 선택해주세요.'); return; }
+        let geoData: { lat: number; lng: number; error?: string };
         const geoResp = await fetch(`/api/geocode?address=${encodeURIComponent(address)}`);
-        const geoData = await geoResp.json();
-        if (!geoResp.ok) { setError(geoData.error || '주소 변환 실패'); return; }
+        const serverGeo = await geoResp.json();
+
+        if (geoResp.ok && serverGeo.lat) {
+          geoData = serverGeo;
+        } else if (typeof window !== 'undefined' && window.kakao?.maps?.services) {
+          // [Client-side Fallback] 서버 지오코딩 실패 시 브라우저에서 직접 시도
+          const geocoder = new window.kakao.maps.services.Geocoder();
+          const clientGeo = await new Promise<{ lat: number; lng: number } | null>((resolve) => {
+            geocoder.addressSearch(address, (res: any, status: any) => {
+              if (status === window.kakao.maps.services.Status.OK && res[0]) {
+                resolve({ lat: parseFloat(res[0].y), lng: parseFloat(res[0].x) });
+              } else {
+                resolve(null);
+              }
+            });
+          });
+          if (!clientGeo) { setError(serverGeo.error || '주소를 찾을 수 없습니다.'); return; }
+          geoData = clientGeo;
+        } else {
+          setError(serverGeo.error || '주소 변환 실패');
+          return;
+        }
+
         const searchResp = await fetch('/api/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
