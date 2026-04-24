@@ -146,8 +146,15 @@ function buildPdfHtml(
 
   // 지도용 마커 데이터 (JSON)
   const markerData = available.map(c => ({
-    lat: c.lat, lng: c.lng, name: c.name,
-    units: c.units, households: c.households,
+    name: c.name,
+    lat: c.lat,
+    lng: c.lng,
+    addr_road: c.addr_road,
+    addr_parcel: c.addr_parcel,
+    city: c.city,
+    district: c.district,
+    units: c.units,
+    households: c.households,
     distance: c.distance_km.toFixed(1),
   }));
 
@@ -488,7 +495,7 @@ kakao.maps.load(function() {
       bounds.extend(pos);
       new kakao.maps.Marker({ position: pos, map: map, image: markerImage, title: c.name });
     } else {
-      var query = (c.addr_road || c.addr_parcel || c.name).trim();
+      var query = (c.addr_road || c.addr_parcel || ((c.city || '') + ' ' + (c.district || '') + ' ' + c.name)).trim();
       if (!query) return;
       pendingCount++;
       geocoder.addressSearch(query, function(res, status) {
@@ -496,6 +503,15 @@ kakao.maps.load(function() {
           var pos = new kakao.maps.LatLng(res[0].y, res[0].x);
           bounds.extend(pos);
           new kakao.maps.Marker({ position: pos, map: map, image: markerImage, title: c.name });
+        } else {
+          // 최후의 수단: 단순히 이름으로만 한 번 더 시도
+          geocoder.addressSearch(c.name, function(res2, status2) {
+            if (status2 === kakao.maps.services.Status.OK && res2[0]) {
+              var pos2 = new kakao.maps.LatLng(res2[0].y, res2[0].x);
+              bounds.extend(pos2);
+              new kakao.maps.Marker({ position: pos2, map: map, image: markerImage, title: c.name });
+            }
+          });
         }
         pendingCount--;
         if (pendingCount === 0) updateBounds();
