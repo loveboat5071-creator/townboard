@@ -473,7 +473,7 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
 
   // [Targeted Healing] 현재 검색 주소와 관련된 핵심 키워드 추출 (지오코딩 쿼터 절약)
   const searchKeywords = (address || '').split(/\s+/).filter(k => k.length >= 2);
-  // 광역 자치단체명은 제외 + '동/구/시' 꼬리를 떼서 유연한 매칭 (송도동 -> 송도)
+  // 광역 자치단체명은 제외 + '동/구/시' 꼬리를 떼서 유연한 매칭
   const genericTerms = /^(서울|경기|인천|부산|대구|광주|대전|울산|세종|강원|충북|충남|전북|전남|경북|경남|제주)/;
   const baseKeywords = searchKeywords
     .filter(k => !genericTerms.test(k))
@@ -483,15 +483,15 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
   let recoveredCount = 0;
 
   for (const complex of data) {
-    // [Self-Healing] 좌표가 없거나 기본값인 경우 실시간 복구 시도 (성능 범위 내 최대 60개)
+    // [Self-Healing] 좌표가 없거나 기본값인 경우 실시간 복구 시도 (성능 범위 내 최대 100개)
     let finalLat = Number(complex.lat || 0);
     let finalLng = Number(complex.lng || 0);
     const isInvalidGeo = !finalLat || finalLat === 37.5665 || !finalLng;
 
-    if (isInvalidGeo && complex.addr_road && recoveredCount < 60) {
+    if (isInvalidGeo && complex.addr_road && recoveredCount < 100) {
       const complexFullText = `${complex.city || ''} ${complex.district || ''} ${complex.dong || ''} ${complex.name || ''} ${complex.addr_road || ''}`;
       
-      // 검색어와 DB 데이터 간의 유연한 일치 여부 확인
+      // 검색어와 일치하거나, 검색 주소의 핵심 구/동이 포함된 경우 우선 복구
       const isRelevant = baseKeywords.length > 0 
         ? baseKeywords.some(k => complexFullText.includes(k)) 
         : searchKeywords.some(k => complexFullText.includes(k));
