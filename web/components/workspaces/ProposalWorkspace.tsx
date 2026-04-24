@@ -291,7 +291,6 @@ export default function ProposalWorkspace() {
             advertiser_industry: advertiserIndustry || undefined,
             advertiser_name: advertiserName || undefined,
             campaign_name: campaignName || undefined,
-            campaign_date: campaignDate,
           }),
         });
         
