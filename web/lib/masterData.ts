@@ -516,11 +516,23 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
       continue;
     }
 
-    // [Strict Radius Filter] 좌표가 없는 아파트는 반경 검색에서 제외하여 '전체 노출' 방지
-    const hasLat = !!(complex.lat && complex.lat !== 0 && complex.lat !== 37.5665 && complex.lng);
-    if (!hasLat) continue;
+    // [Smart Coordinate Recovery] 좌표가 없거나 기본값인 경우, 해당 구에 속한다면 실시간으로 위치 복구 시도 (원본급 지능)
+    let finalLat = Number(complex.lat || 0);
+    let finalLng = Number(complex.lng || 0);
+    const isMissingGeo = !finalLat || finalLat === 37.5665 || !finalLng;
 
-    const dist = haversineDistance(lat, lng, complex.lat as number, complex.lng as number);
+    if (isMissingGeo && isTargetDistrict) {
+      const recovered = await fetchKakaoLocationInternal(complex.addr_road || complex.addr_parcel || `${complex.city} ${complex.district} ${complex.name}`);
+      if (recovered) {
+        finalLat = recovered.lat;
+        finalLng = recovered.lng;
+      }
+    }
+
+    // 좌표가 여전히 없다면 제외
+    if (!finalLat || finalLat === 0 || !finalLng) continue;
+
+    const dist = haversineDistance(lat, lng, finalLat, finalLng);
     if (dist > maxRadius) continue;
 
     const restrictionStatus = checkRestriction(complex, advertiser_industry, campaignDateObj);
@@ -535,6 +547,8 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
 
     matched.push({
       ...complex,
+      lat: finalLat,
+      lng: finalLng,
       price_4w: finalPrice,
       distance_km: parseFloat(dist.toFixed(2)),
       radius_band: classified.radius_band,
