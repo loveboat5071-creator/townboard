@@ -601,7 +601,11 @@ export async function searchByDistrict(req: {
   const matched: MatchedComplex[] = [];
 
   for (const complex of data) {
-    if (!districtSet.has(normalizeFilterText(complex.district))) continue;
+    const complexDistrict = normalizeFilterText(complex.district || '');
+    const isMatched = Array.from(districtSet).some(d => 
+      complexDistrict.includes(d) || d.includes(complexDistrict)
+    );
+    if (!isMatched) continue;
     if (require_ev && !complex.ev_charger_installed) continue;
 
     // 좌표가 없는 경우 실시간 보정
