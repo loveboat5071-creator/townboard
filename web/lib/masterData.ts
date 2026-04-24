@@ -490,12 +490,24 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
   );
   const matched: MatchedComplex[] = [];
 
+  // [Smart Radius Search] 검색 주소에서 구(District)를 추출하여 해당 지역 아파트 좌표 우선 복구
+  const targetDistrictMatch = address.match(/(\S+(?:시|군|구))/);
+  const targetDistrict = targetDistrictMatch ? normalizeFilterText(targetDistrictMatch[1]) : '';
+
   for (const complex of data) {
-    // 좌표가 없는 경우 실시간 보정
+    if (require_ev && !complex.ev_charger_installed) continue;
+
+    const complexDistrict = normalizeFilterText(complex.district || '');
+
+    // 구 단위 필터가 있는 경우 (반경 조회에서는 생략하는 경우가 많지만 안전장치로 유지)
+    if (districtSet.size > 0 && !districtSet.has(complexDistrict)) {
+      continue;
+    }
+
+    // 좌표가 없거나 기본값인데 검색 지역과 일치하는 경우 실시간 좌표 복구
     if (complex.lat == null || complex.lat === 0 || complex.lat === 37.5665) {
-      const addr = complex.addr_road || complex.addr_parcel || '';
-      if (addr) {
-        // 모든 아파트를 다 지오코딩하면 속도가 느려지므로, 시/도 정도만 간단히 확인하거나 일단 시도
+      if (complexDistrict && targetDistrict && (complexDistrict.includes(targetDistrict) || targetDistrict.includes(complexDistrict))) {
+        const addr = complex.addr_road || complex.addr_parcel || `${complex.city} ${complex.district} ${complex.name}`;
         const geo = await fetchKakaoLocationInternal(addr);
         if (geo) {
           complex.lat = geo.lat;
@@ -508,15 +520,9 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
       typeof complex.lat !== 'number' ||
       typeof complex.lng !== 'number' ||
       !Number.isFinite(complex.lat) ||
-      !Number.isFinite(complex.lng)
+      !Number.isFinite(complex.lng) ||
+      complex.lat === 0
     ) continue;
-
-    if (districtSet.size > 0 && !districtSet.has(normalizeFilterText(complex.district))) {
-      continue;
-    }
-    if (require_ev && !complex.ev_charger_installed) {
-      continue;
-    }
 
     const dist = haversineDistance(lat, lng, complex.lat, complex.lng);
     if (dist > maxRadius) continue;
@@ -534,7 +540,7 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
     matched.push({
       ...complex,
       price_4w: finalPrice,
-      distance_km: classified.distance_km,
+      distance_km: parseFloat(dist.toFixed(2)),
       radius_band: classified.radius_band,
       restriction_status: restrictionStatus,
     });
