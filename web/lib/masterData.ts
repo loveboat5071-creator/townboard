@@ -499,32 +499,9 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
 
     const complexDistrict = normalizeFilterText(complex.district || '');
 
-    // 구 단위 필터가 있는 경우 (반경 조회에서는 생략하는 경우가 많지만 안전장치로 유지)
+    // 구 단위 필터가 있는 경우
     if (districtSet.size > 0 && !districtSet.has(complexDistrict)) {
       continue;
-    }
-
-    const complexCity = normalizeFilterText(complex.city || '');
-    const searchCity = address.split(/\s+/)[0] ? normalizeFilterText(address.split(/\s+/)[0]) : '';
-
-    // [Optimized Geocoding] 좌표가 없는데 반경 내에 있을 가능성이 있는 경우 복구
-    if (complex.lat == null || complex.lat === 0 || complex.lat === 37.5665) {
-      
-      // 검색 주소의 도시(예: 인천)와 아파트의 도시가 일치하는 경우에만 추진
-      if (complexCity && searchCity && (complexCity.includes(searchCity) || searchCity.includes(complexCity))) {
-        // 행정구역 명칭 변경 대응 (미추홀-남구 등) 또는 같은 구인 경우 우선 복구
-        const isSameDistrict = complexDistrict && targetDistrict && (complexDistrict.includes(targetDistrict) || targetDistrict.includes(complexDistrict));
-        const isNearByGu = (targetDistrict === '미추홀구' && complexDistrict === '남구') || (targetDistrict === '남구' && complexDistrict === '미추홀구');
-        
-        if (isSameDistrict || isNearByGu) {
-          const addr = complex.addr_road || complex.addr_parcel || `${complex.city} ${complex.district} ${complex.name}`;
-          const geo = await fetchKakaoLocationInternal(addr);
-          if (geo) {
-            complex.lat = geo.lat;
-            complex.lng = geo.lng;
-          }
-        }
-      }
     }
 
     // 좌표가 없더라도 선택한 행정구역(targetDistrict)에 속한다면 일단 포함 (클라이언트에서 복구할 기회를 줌)

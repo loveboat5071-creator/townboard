@@ -386,13 +386,20 @@ export default function ProposalWorkspace() {
             });
           }));
           
-          // 중간 결과 업데이트 (요약 정보 포함)
-          const currentFiltered = finalResults.filter(item => !item.distance_km || item.distance_km <= maxRadiusKm);
+          // 중간 결과 업데이트 (좌표가 없는 것도 일단 다 보여줌)
+          const currentFiltered = finalResults.filter(item => {
+            if (!item.lat || item.lat === 0 || item.lat === 37.5665) return true; // 좌표 없으면 일단 노출
+            return item.distance_km <= maxRadiusKm;
+          });
           const stats = recalculateAll(currentFiltered);
           setResult(prev => prev ? { 
             ...prev, 
             ...stats,
-            results: [...currentFiltered].sort((a, b) => (a.distance_km || 0) - (b.distance_km || 0)) 
+            results: [...currentFiltered].sort((a, b) => {
+              if (!a.distance_km) return 1;
+              if (!b.distance_km) return -1;
+              return a.distance_km - b.distance_km;
+            }) 
           } : null);
           
           if (i + batchSize < finalResults.length) await new Promise(r => setTimeout(r, 100));
