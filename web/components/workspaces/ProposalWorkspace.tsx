@@ -535,7 +535,6 @@ export default function ProposalWorkspace() {
           error={error}
           onDismissError={() => setError('')}
           onSearch={handleSearch}
-          debugInfo={result?.debug_total_scanned !== undefined ? `마스터 데이터베이스에서 총 ${result.debug_total_scanned.toLocaleString()}건의 레코드가 검색 대상입니다.` : undefined}
         />
 
         {result ? (

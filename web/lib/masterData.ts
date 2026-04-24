@@ -491,47 +491,29 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
   const matched: MatchedComplex[] = [];
 
   for (const complex of data) {
-    if (require_ev && !complex.ev_charger_installed) continue;
-
-    // [Original App Strategy] 지역 제한 없이 오직 '좌표'와 '거리'에만 집중함
-    let finalLat = Number(complex.lat || 0);
-    let finalLng = Number(complex.lng || 0);
-    const isMissingGeo = !finalLat || finalLat === 37.5665 || !finalLng;
-
-    // 좌표가 없는 경우, 주소 텍스트에 검색어 키워드(예: 남동구)가 포함된 경우에만 보조적으로 위치 복구 시도 (과부하 방지)
-    if (isMissingGeo && (
-      (address && complex.addr_road && complex.addr_road.includes(address.split(' ')[1] || '')) ||
-      (districtSet.size > 0 && districtSet.has(normalizeFilterText(complex.district)))
-    )) {
-      const recovered = await fetchKakaoLocationInternal(complex.addr_road || complex.addr_parcel || `${complex.city} ${complex.district} ${complex.name}`);
-      if (recovered) {
-        finalLat = recovered.lat;
-        finalLng = recovered.lng;
-      }
+    if (
+      typeof complex.lat !== 'number' ||
+      typeof complex.lng !== 'number' ||
+      !Number.isFinite(complex.lat) ||
+      !Number.isFinite(complex.lng)
+    ) continue;
+    if (districtSet.size > 0 && !districtSet.has(normalizeFilterText(complex.district))) {
+      continue;
+    }
+    if (require_ev && !complex.ev_charger_installed) {
+      continue;
     }
 
-    // 좌표가 여전히 없거나 폴백(서울중심)이면 제외
-    if (!finalLat || finalLat === 0 || finalLat === 37.5665) continue;
-
-    const dist = haversineDistance(lat, lng, finalLat, finalLng);
+    const dist = haversineDistance(lat, lng, complex.lat, complex.lng);
     if (dist > maxRadius) continue;
 
     const restrictionStatus = checkRestriction(complex, advertiser_industry, campaignDateObj);
     const classified = classifyByRadius(dist, radii);
     if (!classified) continue;
 
-    // 단지총단가 실시간 복구
-    let finalPrice = Number(complex.price_4w || 0);
-    if (finalPrice <= 0) {
-      finalPrice = Number(complex.units || 0) * Number(complex.unit_price || 0);
-    }
-
     matched.push({
       ...complex,
-      lat: finalLat,
-      lng: finalLng,
-      price_4w: finalPrice,
-      distance_km: parseFloat(dist.toFixed(2)),
+      distance_km: classified.distance_km,
       radius_band: classified.radius_band,
       restriction_status: restrictionStatus,
     });
@@ -556,7 +538,6 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
     total_households: available.reduce((s, c) => s + (c.households || 0), 0),
     total_units: available.reduce((s, c) => s + (c.units || 0), 0),
     total_price_4w: available.reduce((s, c) => s + (c.price_4w || 0), 0),
-    debug_total_scanned: data.length,
   };
 }
 
