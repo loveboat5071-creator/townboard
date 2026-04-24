@@ -249,7 +249,7 @@ export default function SearchForm({
 
       <div className="btn-row">
         <button className="btn btn-primary" onClick={onSearch} disabled={isSearching} style={{ flex: 1 }}>
-          {isSearching ? <><span className="loading-spinner" /> 검색 중...</> : '🔍 검색'}
+          {isSearching ? <><span className="loading-spinner" /> 검색 중...</> : '🔍 진단 검색(v2)'}
         </button>
       </div>
 
