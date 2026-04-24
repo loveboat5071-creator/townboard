@@ -367,16 +367,16 @@ export default function ProposalWorkspace() {
         };
 
         // 초기 필터링 적용 (이미 거리 아는 것들 기준)
-        const initialFiltered = initialResults.filter(item => {
+        const initialFiltered = initialResults.filter((item: any) => {
           if (!item.lat || item.lat === 0 || item.lat === 37.5665) return true;
-          return item.distance_km <= maxRadiusKm;
+          return (item.distance_km || 0) <= maxRadiusKm;
         });
         const initialStats = recalculateAll(initialFiltered);
 
         setResult({ 
           ...searchData, 
           ...initialStats,
-          results: initialFiltered.sort((a, b) => (a.distance_km || 999) - (b.distance_km || 999)),
+          results: initialFiltered.sort((a: any, b: any) => (a.distance_km || 999) - (b.distance_km || 999)),
           center: { lat: centerLat, lng: centerLng, address: address.trim() },
           radii: selectedRadii
         });
@@ -408,15 +408,15 @@ export default function ProposalWorkspace() {
             });
           }));
           
-          const currentFiltered = finalResults.filter(item => {
+          const currentFiltered = finalResults.filter((item: any) => {
             if (!item.lat || item.lat === 0 || item.lat === 37.5665) return true; 
-            return item.distance_km <= maxRadiusKm;
+            return (item.distance_km || 0) <= maxRadiusKm;
           });
           const stats = recalculateAll(currentFiltered);
           setResult(prev => prev ? { 
             ...prev, 
             ...stats,
-            results: [...currentFiltered].sort((a, b) => (a.distance_km || 999) - (b.distance_km || 999)) 
+            results: [...currentFiltered].sort((a: any, b: any) => (a.distance_km || 999) - (b.distance_km || 999)) 
           } : null);
           
           if (i + batchSize < finalResults.length) await new Promise(r => setTimeout(r, 100));
