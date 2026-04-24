@@ -37,6 +37,7 @@ interface Props {
   error: string;
   onDismissError: () => void;
   onSearch: () => void;
+  debugInfo?: string;
 }
 
 export default function SearchForm({
@@ -56,6 +57,7 @@ export default function SearchForm({
   isSearching,
   error, onDismissError,
   onSearch,
+  debugInfo,
 }: Props) {
   const isDistrictMode = searchMode === 'district';
   const trimmedDistrictQuery = districtQuery.trim();
@@ -251,7 +253,7 @@ export default function SearchForm({
         </button>
       </div>
 
-      {error && <ErrorBanner error={error} onDismiss={onDismissError} onRetry={onSearch} />}
+      {error && <ErrorBanner error={error} onDismiss={onDismissError} onRetry={onSearch} debugInfo={debugInfo} />}
     </div>
   );
 }
