@@ -289,6 +289,8 @@ export async function GET(req: NextRequest) {
     console.warn('[Geocode] KAKAO_API_KEY is missing from process.env. Please check Vercel environment variables.');
   }
 
+  const isKeyMissing = !apiKey;
+
   // ── 1. 카카오 API (주소 우선) ──
   if (apiKey) {
     try {
@@ -296,7 +298,7 @@ export async function GET(req: NextRequest) {
       if (addressResult) {
         return NextResponse.json({
           ...addressResult,
-          source: 'kakao',
+          diagnostics: { is_key_missing: false, source: 'kakao_address' }
         });
       }
 
@@ -304,7 +306,7 @@ export async function GET(req: NextRequest) {
       if (keywordResult) {
         return NextResponse.json({
           ...keywordResult,
-          source: 'kakao',
+          diagnostics: { is_key_missing: false, source: 'kakao_keyword' }
         });
       }
     } catch (e) {
@@ -320,7 +322,7 @@ export async function GET(req: NextRequest) {
       lng: station.lng,
       address: station.name,
       road_address: '',
-      source: 'subway_db',
+      diagnostics: { is_key_missing: isKeyMissing, source: 'subway_db' }
     });
   }
 
@@ -332,32 +334,13 @@ export async function GET(req: NextRequest) {
       lng: district.lng,
       address: address,
       road_address: '',
-      source: 'offline_estimate',
+      diagnostics: { is_key_missing: isKeyMissing, source: 'offline_fallback' },
       warning: '구 단위 근사 좌표',
     });
   }
 
-  // ── 4. AI 변환 폴백 ──
-  const aiResult = await parseWithAI(address);
-  if (aiResult && aiResult.address) {
-    // AI가 주소로 변환 → 다시 역/구 검색
-    const aiStation = findStation(aiResult.address);
-    if (aiStation) {
-      return NextResponse.json({
-        lat: aiStation.lat, lng: aiStation.lng,
-        address: aiStation.name, road_address: '', source: 'ai+subway_db',
-      });
-    }
-    const aiDistrict = offlineGeocode(aiResult.address);
-    if (aiDistrict) {
-      return NextResponse.json({
-        lat: aiDistrict.lat, lng: aiDistrict.lng,
-        address: aiResult.address, road_address: '', source: 'ai+offline',
-      });
-    }
-  }
-
   return NextResponse.json({
-    error: '주소를 찾을 수 없습니다. 구 이름이나 지하철역명을 포함해 주세요.',
+    error: '주소를 찾을 수 없습니다. (카카오 API 키 설정 확인 필요)',
+    diagnostics: { is_key_missing: isKeyMissing, source: 'none' }
   }, { status: 404 });
 }
