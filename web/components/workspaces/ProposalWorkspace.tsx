@@ -281,12 +281,16 @@ export default function ProposalWorkspace() {
         const textDistrictMatch = address.match(/(\S+(?:시|군|구))/);
         const finalDistrict = geoData.district || (textDistrictMatch ? textDistrictMatch[1] : '');
 
-        // [Hybrid Radius Search] Fetch district data and geocode on client for maximum reliability
+        // [Broad Search Strategy] 구 보다는 '시' 단위로 넓게 데이터를 가져와서 반경 내 누락 방지
+        const cityMatch = address.split(/\s+/)[0];
+        const searchDistricts = [cityMatch, finalDistrict].filter(Boolean);
+
+        // [Hybrid Radius Search] Fetch wide data and geocode on client for maximum reliability
         const searchResp = await fetch('/api/search-district', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            districts: [finalDistrict].filter(Boolean),
+            districts: searchDistricts,
             require_ev: requireEvOnly,
             sort_by: sortBy,
             advertiser_industry: advertiserIndustry || undefined,

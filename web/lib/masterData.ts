@@ -526,16 +526,23 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
       }
     }
 
+    // 좌표가 없더라도 같은 도시/구에 속한다면 일단 포함 (클라이언트에서 복구할 기회를 줌)
+    const isNearEnoughToTry = complexCity && searchCity && (complexCity.includes(searchCity) || searchCity.includes(complexCity));
+    
     if (
-      typeof complex.lat !== 'number' ||
+      (typeof complex.lat !== 'number' ||
       typeof complex.lng !== 'number' ||
       !Number.isFinite(complex.lat) ||
       !Number.isFinite(complex.lng) ||
-      complex.lat === 0
+      complex.lat === 0) && !isNearEnoughToTry
     ) continue;
 
-    const dist = haversineDistance(lat, lng, complex.lat, complex.lng);
-    if (dist > maxRadius) continue;
+    // 좌표가 있는 경우에만 거리 계산. 없으면 0으로 일단 처리
+    const hasLat = complex.lat && complex.lat !== 0 && complex.lat !== 37.5665;
+    const dist = hasLat ? haversineDistance(lat, lng, complex.lat, complex.lng) : 0;
+    
+    // 좌표가 있는 경우에만 반경 필터링 수행. 좌표 없으면 일단 통과(클라이언트가 나중에 거름)
+    if (hasLat && dist > maxRadius) continue;
 
     const restrictionStatus = checkRestriction(complex, advertiser_industry, campaignDateObj);
     const classified = classifyByRadius(dist, radii);
