@@ -614,11 +614,13 @@ export async function searchByDistrict(req: {
     const complexCity = normalizeFilterText(complex.city || '');
     const complexDistrict = normalizeFilterText(complex.district || '');
     
-    const isMatched = Array.from(districtSet).some(d => 
-      complexCity.includes(d) || 
-      complexDistrict.includes(d) ||
-      (d === '미추홀구' && complexDistrict === '남구') ||
-      (d === '남구' && complexDistrict === '미추홀구')
+    // 가장 구체적인 지역명(마지막 토큰)을 우선적으로 매칭하여 '인천' 전체가 나오는 것 방지
+    const mostSpecific = Array.from(districtSet).pop() || '';
+    const isMatched = (
+      complexCity.includes(mostSpecific) || 
+      complexDistrict.includes(mostSpecific) ||
+      (mostSpecific === '미추홀구' && complexDistrict === '남구') ||
+      (mostSpecific === '남구' && complexDistrict === '미추홀구')
     );
     if (!isMatched) continue;
     if (require_ev && !complex.ev_charger_installed) continue;
