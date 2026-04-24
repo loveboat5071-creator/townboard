@@ -393,7 +393,6 @@ export default function ProposalWorkspace() {
           };
         });
       } else {
-      } else {
         let effectiveDistricts = selectedDistricts;
 
         if (effectiveDistricts.length === 0) {
