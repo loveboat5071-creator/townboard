@@ -516,13 +516,12 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
       continue;
     }
 
-    // 거리는 일단 0으로 주고 클라이언트에서 도로명 주소/좌표 기반 정밀 계산 추진
-    // 단, DB에 이미 좌표가 있는 경우엔 서버에서 미리 계산하여 초기 속도 향상
+    // [Strict Radius Filter] 좌표가 없는 아파트는 반경 검색에서 제외하여 '전체 노출' 방지
     const hasLat = !!(complex.lat && complex.lat !== 0 && complex.lat !== 37.5665 && complex.lng);
-    const dist = hasLat ? haversineDistance(lat, lng, complex.lat as number, complex.lng as number) : 0;
-    
-    // 좌표가 이미 있는 아파트가 반경 밖에 있다면 과감히 초기 단계에서 제외
-    if (hasLat && dist > maxRadius) continue;
+    if (!hasLat) continue;
+
+    const dist = haversineDistance(lat, lng, complex.lat as number, complex.lng as number);
+    if (dist > maxRadius) continue;
 
     const restrictionStatus = checkRestriction(complex, advertiser_industry, campaignDateObj);
     const classified = classifyByRadius(dist, radii);
