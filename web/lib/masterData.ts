@@ -490,21 +490,20 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
   );
   const matched: MatchedComplex[] = [];
 
-  // [Smart Radius Search] 검색 주소에서 구(District)를 추출하여 해당 지역 아파트 좌표 우선 복구
-  const targetDistrictMatch = address.match(/(\S+(?:시|군|구))/);
-  const targetDistrict = targetDistrictMatch ? normalizeFilterText(targetDistrictMatch[1]) : '';
+  // [Simple District Priority] 클라이언트가 보내준 특정 구(District)를 최우선으로 매칭
+  const targetDistrict = districts[districts.length - 1] || '';
 
   for (const complex of data) {
     if (require_ev && !complex.ev_charger_installed) continue;
 
-    // [Simplified Search] 사용자 주소 기반 구(District) 이름이 일치하거나 옛 명칭인 경우만 통과
-    const complexDistrict = normalizeFilterText(complex.district || '');
-    const isTargetDistrict = complexDistrict && targetDistrict && (
+    // [Direct Name Match] 아파트의 구 이름과 검색 대상 구를 1:1 또는 포함 관계로 대조 (원본 앱 방식)
+    const complexDistrict = complex.district || '';
+    const isTargetDistrict = targetDistrict && (
       complexDistrict === targetDistrict ||
       complexDistrict.includes(targetDistrict) ||
       targetDistrict.includes(complexDistrict) ||
-      (targetDistrict === '미추홀' && complexDistrict === '남') ||
-      (targetDistrict === '남' && complexDistrict === '미추홀')
+      (targetDistrict.includes('미추홀') && complexDistrict.includes('남구')) || 
+      (targetDistrict.includes('남') && complexDistrict.includes('미추홀'))
     );
     
     // 주소에서 구 이름을 찾았는데, 아파트가 다른 구에 속한다면 과감히 제외 (과부하 방지)
