@@ -318,6 +318,7 @@ export default function ProposalWorkspace() {
         }
 
         if (!searchData.results || searchData.results.length === 0) {
+          setResult(searchData); // 진단 데이터(debug_total_scanned)를 위해 상태 업데이트
           setError('해당 지역에 검색된 아파트가 없습니다. 주소를 다시 확인해주세요.');
           return;
         }
