@@ -603,7 +603,7 @@ export async function searchByDistrict(req: {
   for (const complex of data) {
     const complexDistrict = normalizeFilterText(complex.district || '');
     const isMatched = Array.from(districtSet).some(d => 
-      complexDistrict.includes(d) || d.includes(complexDistrict)
+      complexDistrict.includes(d)
     );
     if (!isMatched) continue;
     if (require_ev && !complex.ev_charger_installed) continue;
