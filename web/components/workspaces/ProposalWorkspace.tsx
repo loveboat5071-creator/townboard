@@ -188,33 +188,58 @@ export default function ProposalWorkspace() {
     asset_kinds: creativeAssetKinds,
   });
 
+  // 평형 데이터가 뭉쳐있을 경우(4344 -> 43, 44) 자동 복구하는 헬퍼
+  const formatPyeong = (p: string | number | null): string => {
+    if (p == null) return '-';
+    const s = String(p).trim();
+    if (!s || s === '-') return '-';
+    if (s.includes(',')) return s; // 이미 쉼표가 있으면 통과
+    // 숫자로만 되어 있고 4자 이상 짝수 길이면 2자리씩 끊어서 쉼표 추가
+    if (/^\d{4,}$/.test(s) && s.length % 2 === 0) {
+      const chunks = [];
+      for (let i = 0; i < s.length; i += 2) {
+        chunks.push(s.slice(i, i + 2));
+      }
+      return chunks.join(', ');
+    }
+    return s;
+  };
+
+  const tryClientSideGeocode = useCallback((data: SearchResult, retryCount = 0) => {
+    const win = window as any;
+    // 카카오 SDK 서비스 라이브러리가 로드될 때까지 재시도 (최대 10회)
+    if (!win.kakao?.maps?.services) {
+      if (retryCount < 10) {
+        setTimeout(() => tryClientSideGeocode(data, retryCount + 1), 500);
+      }
+      return;
+    }
+
+    const geocoder = new win.kakao.maps.services.Geocoder();
+    data.results.forEach((item: any) => {
+      // 평형 데이터 실시간 후보정 적용
+      item.area_pyeong = formatPyeong(item.area_pyeong);
+
+      const lat = parseFloat(String(item.lat || '0'));
+      if (!lat || lat <= 0 || lat === 37.5665) {
+        const query = (item.addr_road || item.addr_parcel || `${item.city || ''} ${item.district || ''} ${item.name}`).trim();
+        if (!query) return;
+
+        geocoder.addressSearch(query, (res: any, status: any) => {
+          if (status === win.kakao.maps.services.Status.OK && res[0]) {
+            item.lat = parseFloat(res[0].y);
+            item.lng = parseFloat(res[0].x);
+            setResult(prev => prev ? { ...prev, results: [...prev.results] } : prev);
+          }
+        });
+      }
+    });
+  }, [setResult]);
+
   const handleSearch = useCallback(async () => {
     setIsSearching(true);
     setError('');
     setResult(null);
-
-    const tryClientSideGeocode = (data: SearchResult) => {
-      const win = window as any;
-      if (data.results && typeof win !== 'undefined' && win.kakao?.maps?.services) {
-        const geocoder = new win.kakao.maps.services.Geocoder();
-        data.results.forEach((item: any) => {
-          // 좌표가 없거나(null/undefined), 0이거나, 기본값인 경우 모두 체크
-          const lat = parseFloat(String(item.lat || '0'));
-          if (!lat || lat <= 0 || lat === 37.5665) {
-            const query = (item.addr_road || item.addr_parcel || `${item.city || ''} ${item.district || ''} ${item.name}`).trim();
-            if (!query) return;
-
-            geocoder.addressSearch(query, (res: any, status: any) => {
-              if (status === win.kakao.maps.services.Status.OK && res[0]) {
-                item.lat = parseFloat(res[0].y);
-                item.lng = parseFloat(res[0].x);
-                setResult(prev => prev ? { ...prev, results: [...prev.results] } : prev);
-              }
-            });
-          }
-        });
-      }
-    };
 
     try {
       if (searchMode === 'radius') {

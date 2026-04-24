@@ -23,6 +23,21 @@ const BORDERS: Partial<ExcelJS.Borders> = {
 const NUM_FMT = '#,##0';
 const DECIMAL_FMT = '#,##0.00';
 
+function formatPyeong(p: string | number | null): string {
+  if (p == null) return '-';
+  const s = String(p).trim();
+  if (!s || s === '-') return '-';
+  if (s.includes(',')) return s;
+  if (/^\d{4,}$/.test(s) && s.length % 2 === 0) {
+    const chunks = [];
+    for (let i = 0; i < s.length; i += 2) {
+      chunks.push(s.slice(i, i + 2));
+    }
+    return chunks.join(', ');
+  }
+  return s;
+}
+
 // ── 메인 생성 함수 ──────────────────────────
 
 export async function generateExcel(
@@ -298,45 +313,45 @@ function buildListSheet(
 
   // Row 4+: 데이터
   let row = 4;
-  for (const c of complexes) {
-    const raw = c as any;
-    const allVals: (string | number | null)[] = [
-      raw.building_type ?? '-',
-      c.name,
-      raw.built_year ?? '-',
-      c.city,
-      c.district,
-      c.dong,
-      c.addr_road,
-      raw.area_pyeong ?? '-',
-      c.households,
-      c.units,
-      c.unit_price,
-      c.price_4w,
-    ];
-    // Filter vals by visible indices
-    const visibleOrigIndices = visibleIndices.map((vis, idx) => vis ? idx : -1).filter(idx => idx !== -1);
-    const vals = allVals.filter((_, i) => visibleIndices[i]);
+    for (const c of complexes) {
+      const raw = c as any;
+      const allVals: (string | number | null)[] = [
+        raw.building_type ?? '-',
+        c.name,
+        raw.built_year ?? '-',
+        c.city,
+        c.district,
+        c.dong,
+        c.addr_road,
+        formatPyeong(raw.area_pyeong), // 평형 자동 복구 적용
+        c.households,
+        c.units,
+        c.unit_price,
+        c.price_4w,
+      ];
+      // Filter vals by visible indices
+      const visibleOrigIndices = visibleIndices.map((vis, idx) => vis ? idx : -1).filter(idx => idx !== -1);
+      const vals = allVals.filter((_, i) => visibleIndices[i]);
 
-    vals.forEach((v, i) => {
-      const origIdx = visibleOrigIndices[i];
-      const colKey = LIST_COL_KEYS[origIdx];
-      const cell = ws.getCell(row, i + 2);
-      
-      cell.value = v as ExcelJS.CellValue;
-      cell.font = VALUE_FONT;
-      cell.border = BORDERS;
+      vals.forEach((v, i) => {
+        const origIdx = visibleOrigIndices[i];
+        const colKey = LIST_COL_KEYS[origIdx];
+        const cell = ws.getCell(row, i + 2);
+        
+        cell.value = v as ExcelJS.CellValue;
+        cell.font = VALUE_FONT;
+        cell.border = BORDERS;
 
-      // 숫자 서식 적용 (입주년도와 평형은 제외 - 텍스트 유지)
-      if (typeof v === 'number' && colKey !== 'built_year' && colKey !== 'area_pyeong') {
-        cell.numFmt = NUM_FMT;
-      } else if (colKey === 'built_year' || colKey === 'area_pyeong') {
-        // 텍스트로 강제 인식하여 쉼표 변형 방지
-        cell.numFmt = '@'; 
-      }
-    });
-    row++;
-  }
+        // 숫자 서식 적용 (입주년도와 평형은 제외 - 텍스트 유지)
+        if (typeof v === 'number' && colKey !== 'built_year' && colKey !== 'area_pyeong') {
+          cell.numFmt = NUM_FMT;
+        } else if (colKey === 'built_year' || colKey === 'area_pyeong') {
+          // 텍스트로 강제 인식하여 쉼표 변형 방지
+          cell.numFmt = '@'; 
+        }
+      });
+      row++;
+    }
 
   // 합계행
   row++;

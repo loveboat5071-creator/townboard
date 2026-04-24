@@ -39,6 +39,21 @@ function formatAddressWithSpaces(addr: string): string {
     .trim();
 }
 
+function formatPyeong(p: string | number | null): string {
+  if (p == null) return '-';
+  const s = String(p).trim();
+  if (!s || s === '-') return '-';
+  if (s.includes(',')) return s;
+  if (/^\d{4,}$/.test(s) && s.length % 2 === 0) {
+    const chunks = [];
+    for (let i = 0; i < s.length; i += 2) {
+      chunks.push(s.slice(i, i + 2));
+    }
+    return chunks.join(', ');
+  }
+  return s;
+}
+
 function buildPdfHtml(
   data: SearchResponse,
   advertiserName: string,
@@ -90,7 +105,7 @@ function buildPdfHtml(
     if (col('addr_road')) cells.push(`<td class="addr"><div class="cell-clamp">${escapeHtml(formatAddressWithSpaces(c.addr_road || c.addr_parcel || ''))}</div></td>`);
     if (col('building_type')) cells.push(`<td>${escapeHtml(shortType(c.building_type))}</td>`);
     if (col('built_year')) cells.push(`<td class="num">${c.built_year || '-'}</td>`);
-    if (col('area_pyeong')) cells.push(`<td>${escapeHtml(String(c.area_pyeong || ''))}</td>`);
+    if (col('area_pyeong')) cells.push(`<td>${escapeHtml(formatPyeong(c.area_pyeong))}</td>`);
     if (col('households')) cells.push(`<td class="num">${fmt(c.households)}</td>`);
     if (col('units')) cells.push(`<td class="num">${fmt(c.units)}</td>`);
     if (col('unit_price')) cells.push(`<td class="num">${fmt(c.unit_price)}</td>`);
