@@ -131,14 +131,14 @@ export default function ProposalWorkspace() {
     fetch('/api/industries')
       .then(r => r.json())
       .then(d => setIndustries(d.industries || []))
-      .catch(() => {});
+      .catch(() => { });
     fetch('/api/districts')
       .then(r => r.json())
       .then(d => {
         setGroupedDistricts(d.grouped || []);
         if (d.grouped && d.grouped.length > 0) setSelectedCity(d.grouped[0].city);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const toggleExclude = (id: string) => {
@@ -161,11 +161,15 @@ export default function ProposalWorkspace() {
     const trimmed = query.trim();
     if (!trimmed) return [];
 
-    return [...new Set(
-      groupedDistricts
-        .flatMap(group => group.districts)
-        .filter(district => district.includes(trimmed))
-    )];
+    const matches: string[] = [];
+    groupedDistricts.forEach(group => {
+      group.districts.forEach(district => {
+        if (district.includes(trimmed)) {
+          matches.push(`${group.city} ${district}`);
+        }
+      });
+    });
+    return [...new Set(matches)];
   }, [groupedDistricts]);
 
   const getVisibleList = () => {
@@ -248,7 +252,7 @@ export default function ProposalWorkspace() {
         let geoData: { lat: number; lng: number; district?: string; error?: string };
         const geoResp = await fetch(`/api/geocode?address=${encodeURIComponent(address)}`);
         const serverGeo = await geoResp.json();
-        
+
         if (geoResp.ok && serverGeo.lat) {
           geoData = serverGeo;
         } else if (typeof (window as any) !== 'undefined' && (window as any).kakao?.maps?.services) {
@@ -260,8 +264,8 @@ export default function ProposalWorkspace() {
               if (status === win.kakao.maps.services.Status.OK && res[0]) {
                 const result = res[0];
                 let district = result.address?.region_2depth_name || result.road_address?.region_2depth_name || '';
-                resolve({ 
-                  lat: parseFloat(result.y), 
+                resolve({
+                  lat: parseFloat(result.y),
                   lng: parseFloat(result.x),
                   district: district
                 });
@@ -299,11 +303,11 @@ export default function ProposalWorkspace() {
             campaign_name: campaignName || undefined,
           }),
         });
-        
+
         const searchData = await searchResp.json();
-        
+
         if (!searchData.results || searchData.results.length === 0) {
-          setResult(searchData); 
+          setResult(searchData);
           setError('해당 지역에 검색된 아파트가 없습니다. 주소를 다시 확인해주세요.');
           return;
         }

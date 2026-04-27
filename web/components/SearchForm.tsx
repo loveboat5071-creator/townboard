@@ -63,9 +63,9 @@ export default function SearchForm({
   const trimmedDistrictQuery = districtQuery.trim();
   const districtMatches = trimmedDistrictQuery
     ? groupedDistricts
-        .flatMap(g => g.districts.map(d => ({ city: g.city, district: d })))
-        .filter(({ district }) => district.includes(trimmedDistrictQuery))
-        .slice(0, 20)
+      .flatMap(g => g.districts.map(d => ({ city: g.city, district: d })))
+      .filter(({ district }) => district.includes(trimmedDistrictQuery))
+      .slice(0, 20)
     : [];
 
   return (
@@ -155,19 +155,22 @@ export default function SearchForm({
 
             {trimmedDistrictQuery && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                {districtMatches.map(({ city, district }) => (
-                  <button
-                    key={`${city}-${district}`}
-                    onClick={() => {
-                      if (!selectedDistricts.includes(district)) onToggleDistrict(district);
-                      onDistrictQueryChange('');
-                    }}
-                    className={`radius-chip ${selectedDistricts.includes(district) ? 'active' : ''}`}
-                    style={{ padding: '4px 10px', fontSize: 12 }}
-                  >
-                    <span style={{ opacity: 0.6, fontSize: 10 }}>{city} </span>{district}
-                  </button>
-                ))}
+                {districtMatches.map(({ city, district }) => {
+                  const fullId = `${city} ${district}`;
+                  return (
+                    <button
+                      key={fullId}
+                      onClick={() => {
+                        if (!selectedDistricts.includes(fullId)) onToggleDistrict(fullId);
+                        onDistrictQueryChange('');
+                      }}
+                      className={`radius-chip ${selectedDistricts.includes(fullId) ? 'active' : ''}`}
+                      style={{ padding: '4px 10px', fontSize: 12 }}
+                    >
+                      <span style={{ opacity: 0.6, fontSize: 10 }}>{city} </span>{district}
+                    </button>
+                  );
+                })}
                 {districtMatches.length === 0 && (
                   <span style={{ fontSize: 12, color: 'var(--text-muted)', padding: 4 }}>검색 결과 없음</span>
                 )}
@@ -188,16 +191,19 @@ export default function SearchForm({
                   ))}
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 140, overflowY: 'auto' }}>
-                  {groupedDistricts.find(g => g.city === selectedCity)?.districts.map(d => (
-                    <button
-                      key={d}
-                      onClick={() => onToggleDistrict(d)}
-                      className={`radius-chip ${selectedDistricts.includes(d) ? 'active' : ''}`}
-                      style={{ padding: '4px 12px', fontSize: 12 }}
-                    >
-                      {d}
-                    </button>
-                  ))}
+                  {groupedDistricts.find(g => g.city === selectedCity)?.districts.map(d => {
+                    const fullId = `${selectedCity} ${d}`;
+                    return (
+                      <button
+                        key={fullId}
+                        onClick={() => onToggleDistrict(fullId)}
+                        className={`radius-chip ${selectedDistricts.includes(fullId) ? 'active' : ''}`}
+                        style={{ padding: '4px 12px', fontSize: 12 }}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
                 </div>
               </>
             )}

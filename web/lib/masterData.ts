@@ -155,11 +155,11 @@ function extractDistrictFromAddress(address: string): string | null {
   // 패턴 1: '경기도 고양시 일산동구' -> '고양시 일산동구'
   // 패턴 2: '서울시 강남구' -> '강남구'
   // 패턴 3: '인천광역시 남동구' -> '남동구'
-  
+
   for (let i = 0; i < Math.min(tokens.length, 3); i++) {
     const token = tokens[i];
-    const next = tokens[i+1];
-    
+    const next = tokens[i + 1];
+
     if (/(?:시)$/.test(token) && next && /(?:구|군)$/.test(next)) {
       return `${token} ${next}`;
     }
@@ -217,7 +217,7 @@ export function loadMasterData(): Complex[] {
 /** 서버사이드: 마스터 데이터 비동기 로드 (Blob 우선) */
 export async function loadMasterDataAsync(): Promise<Complex[]> {
   if (_cache) return _cache;
-  
+
   // Blob에서 시도
   const blobData = await loadFromBlob();
   if (blobData && blobData.length > 0) {
@@ -479,7 +479,7 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
     .filter(k => !genericTerms.test(k))
     .map(k => k.replace(/(동|구|시)$/, ''))
     .filter(k => k.length >= 2);
-  
+
   let recoveredCount = 0;
 
   for (const complex of data) {
@@ -490,12 +490,12 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
 
     if (isInvalidGeo && complex.addr_road && recoveredCount < 100) {
       const complexFullText = `${complex.city || ''} ${complex.district || ''} ${complex.dong || ''} ${complex.name || ''} ${complex.addr_road || ''}`;
-      
+
       // 검색어와 일치하거나, 검색 주소의 핵심 구/동이 포함된 경우 우선 복구
-      const isRelevant = baseKeywords.length > 0 
-        ? baseKeywords.some(k => complexFullText.includes(k)) 
+      const isRelevant = baseKeywords.length > 0
+        ? baseKeywords.some(k => complexFullText.includes(k))
         : searchKeywords.some(k => complexFullText.includes(k));
-      
+
       if (isRelevant) {
         const recovered = await fetchKakaoLocationInternal(complex.addr_road);
         if (recovered) {
@@ -508,8 +508,13 @@ export async function searchNearby(req: SearchRequest): Promise<SearchResponse> 
 
     if (!finalLat || finalLat === 0 || finalLat === 37.5665) continue;
 
-    if (districtSet.size > 0 && !districtSet.has(normalizeFilterText(complex.district))) {
-      continue;
+    const normalizedCity = complex.city.replace(/특별시|광역시|특별자치시|특별자치도/g, '').trim();
+    const fullDistrict = `${normalizedCity} ${complex.district}`;
+
+    if (districtSet.size > 0) {
+      const hasFullMatch = districtSet.has(normalizeFilterText(fullDistrict));
+      const hasDistrictMatch = districtSet.has(normalizeFilterText(complex.district));
+      if (!hasFullMatch && !hasDistrictMatch) continue;
     }
     if (require_ev && !complex.ev_charger_installed) {
       continue;
@@ -592,20 +597,13 @@ export async function searchByDistrict(req: {
   const matched: MatchedComplex[] = [];
 
   for (const complex of data) {
-    const complexCity = normalizeFilterText(complex.city || '');
-    const complexDistrict = normalizeFilterText(complex.district || '');
-    
-    // 가장 구체적인 지역명(마지막 토큰)을 우선적으로 매칭하여 '인천' 전체가 나오는 것 방지
-    const specificDistricts = Array.from(districtSet);
-    const target = specificDistricts[specificDistricts.length - 1] || '';
-    
-    const isMatched = (
-      complexCity.includes(target) || 
-      complexDistrict.includes(target) ||
-      (target === '미추홀' && complexDistrict === '남' && complexCity.includes('인천')) ||
-      (target === '남' && complexDistrict === '미추홀' && complexCity.includes('인천'))
-    );
-    if (!isMatched) continue;
+    const normalizedCity = complex.city.replace(/특별시|광역시|특별자치시|특별자치도/g, '').trim();
+    const fullDistrict = `${normalizedCity} ${complex.district}`;
+
+    const hasFullMatch = districtSet.has(normalizeFilterText(fullDistrict));
+    const hasDistrictMatch = districtSet.has(normalizeFilterText(complex.district));
+
+    if (!hasFullMatch && !hasDistrictMatch) continue;
     if (require_ev && !complex.ev_charger_installed) continue;
 
     const restrictionStatus = checkRestriction(complex, advertiser_industry, campaignDateObj);
